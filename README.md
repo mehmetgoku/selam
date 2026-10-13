@@ -11,7 +11,9 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 - **Filtreler**: ortam (öğrenci dostu, romantik, gece hayatı, bütçe dostu…) ve bütçe.
 - **Gezi planlayıcı**: gün/tempo/ilgi/bütçeye göre otomatik plan (kahvaltı → gezi → öğle → … → gece; yakınlık + puan
   optimizasyonu, yürüme/seyahat süreleri, yemek saatleri), sonra elle düzenleme. Plan tarayıcıda saklanır. Gün batımı yerleri kendi dilimine (≥17:30) konur, gündoğumu deneyimleri (balon) otomatik plana girmez, tam gün aktiviteler (tekne turu, Ihlara) sabahı kaplar ve o günün öğle yemeğini atlar; plan 02:00'yi aşmaz.
-- **Harita görünümü**: şehir sayfasında Liste/Harita geçişi (filtreler haritaya da uygulanır, işaretçiden plana ekle); planda her günün rotası numaralı duraklar ve çizgiyle haritada. Leaflet + OpenStreetMap, API anahtarı gerekmez (yoğun trafikte kendi tile sağlayıcınıza geçin).
+- **Harita görünümü**: şehir sayfasında Liste/Harita geçişi (filtreler haritaya da uygulanır, işaretçiden plana ekle); planda her günün rotası numaralı duraklar ve çizgiyle haritada.
+  **Google Haritalar (Maps JavaScript API)** kullanılır: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` tanımlıysa. Anahtar yoksa geliştirme/test için yedek olarak Leaflet + OpenStreetMap çalışır
+  (Google verisi gösteren üretim yapısında anahtar tanımlı olmalı). Ayarlar için `.env.example`.
 - **“Şu an açık”**: kartlarda canlı durum (İstanbul saatiyle: açık/yakında kapanıyor/kapalı + açılış zamanı), listede “Şu an açık”
   filtresi, haritada kapalı mekânlar soluk. Planda gün seçince (ya da “Başlangıç günü”) kapalı mekânlar otomatik plana
   alınmaz, elle eklenenlerde ⚠ uyarısı çıkar. Saatler Google Places'ten `npm run ingest` ile gelir; **saati bilinmeyen
@@ -26,7 +28,7 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 - **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
   yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
 
-> **Mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — özellikle Google Places verisinin Google dışı haritada gösterilemeyeceği lisans kısıtı yayın öncesi çözülmelidir.
+> **Mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — harita Google'a geçti; ama Google Places içeriğinin (puan/saat) kalıcı saklanamaması hâlâ yayın öncesi çözülmesi gereken bir lisans konusudur.
 
 ## Çalıştırma
 

@@ -15,8 +15,11 @@ Durum: web uygulaması (Next.js) hazır; mobil paketleme **henüz yapılmadı**.
 
 ## 2. Veri lisansı — YAYIN ÖNCESİ ÇÖZÜLMELİ
 
-- **Google Places verisi (puan, saatler, yorum sayısı) Google dışı haritada gösterilemez.** Google Maps Platform şartları Places içeriğini yalnızca Google Haritası üzerinde (ya da haritasız) göstermeye izin verir. Uygulamamız OpenStreetMap/Leaflet kullanıyor; harita popup'ında Google kaynaklı puan/saat **göstermiyoruz** (yalnızca "Selam skoru" ve editoryal metin), ama kartlarda Google puanı ve saatleri var. Yayın öncesi ya Google Maps SDK/JS'e geçilmeli, ya Google verisi harita katmanından ayrı tutulmalı, ya da hukuki görüş alınmalı.
-- **Önbellek:** Google, Place ID dışında verinin uzun süreli saklanmasını kısıtlar. Şu an ingest çıktısı `data/signals/` içinde (repoya girmez). Üretimde TTL ile yenileme ve şartlara uygun saklama tasarlanmalı.
+- **Harita: Google Haritalar'a geçildi (karar verildi).** Places içeriği Google dışı haritada gösterilemediği için `GoogleMap.tsx` kullanılır; Leaflet/OSM yalnızca anahtarsız geliştirme yedeğidir ve üretimde kullanılmamalıdır.
+  - Maps JS anahtarı tarayıcıda görünür: **HTTP referrer** ile kısıtla, yalnızca "Maps JavaScript API"ye yetkilendir, bütçe/kota uyarısı kur. Ingest için **ayrı** sunucu anahtarı kullan.
+  - Capacitor (mobil) WebView'ında referrer `https://localhost` / `capacitor://localhost` olur; ya bu kaynakları anahtar kısıtına ekle ya da yerel Google Maps SDK eklentisine (`@capacitor/google-maps`) geç.
+  - Üretimde kendi **Map ID**'ni tanımla (`NEXT_PUBLIC_GOOGLE_MAP_ID`); varsayılan `DEMO_MAP_ID` yalnızca geliştirme içindir.
+- **AÇIK SORUN — Places içeriğinin saklanması:** Google, Place ID dışında (puan, saat, yorum sayısı gibi) içeriğin kalıcı saklanmasını kısıtlar. Şu an `npm run ingest` bunları `data/signals/` dosyasına yazıyor ve `Selam skoru` sunucuda bunlarla hesaplanıyor. Haritanın Google'a geçmesi bunu çözmez. Seçenekler: (a) yalnızca `placeId` sakla, puan/saati kullanıcı kartı açıldığında **canlı** çek (Places JS `fetchFields`; rating/saat daha pahalı SKU'dur, maliyet için tembel yükle); (b) Google puanını sıralamadan çıkarıp skoru editoryal + TripAdvisor'a dayandır, Google verisini yalnızca canlı rozet olarak göster; (c) Google'dan lisans/hukuki görüş al. Karar verilmeden Google verisi canlı sitede yayınlanmamalı.
 - **TripAdvisor:** Content API'de TripAdvisor logosu/atfı ve ilgili sayfaya bağlantı zorunlu; puanları TripAdvisor puanı olarak etiketlemeden birleştirmek ("Selam skoru") şartlar açısından gözden geçirilmeli.
 - **OpenStreetMap karoları (tile.openstreetmap.org)** yoğun/ticari uygulama kullanımına uygun değil; Mapbox/MapTiler vb. sağlayıcıya geçilmeli, OSM atıfı korunmalı.
 
@@ -29,7 +32,7 @@ Durum: web uygulaması (Next.js) hazır; mobil paketleme **henüz yapılmadı**.
 
 ## 4. Önerilen sıra
 
-1. Veri lisansı kararı (Google Maps SDK'ya geçiş **ya da** Google verisini ayırma) ve TripAdvisor atıfı.
+1. Places içeriği saklama kararı (yukarıdaki a/b/c) ve TripAdvisor atıfı.
 2. Barındırma: ortak oda sunucusu için kalıcı depo.
 3. Capacitor iskeleti + 2–3 yerel özellik (çevrimdışı, konum, paylaşım).
 4. TestFlight / Play iç test → kapalı test → yayın.
