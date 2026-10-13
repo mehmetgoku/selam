@@ -1,0 +1,21 @@
+{
+  "slug": "gaziantep",
+  "name": "Gaziantep",
+  "region": "Güneydoğu Anadolu",
+  "tagline": "UNESCO Yaratıcı Şehirler Ağı'nda gastronomi şehri.",
+  "intro": "Gaziantep'te şehir yemekle anlaşılır: beyran sabahın, katmer kahvaltının, baklava ikindinin yıldızı. Merkez yürünebilir; Zeugma Mozaik Müzesi ve Bakırcılar Çarşısı yemek aralarına eklenir.",
+  "signatureDishes": ["Beyran", "Katmer", "Baklava", "Ali Nazik", "Yuvalama", "Menengiç kahvesi"],
+  "lat": 37.0662,
+  "lng": 37.3833,
+  "places": [
+    {"id":"gaz-zeugma","name":"Zeugma Mozaik Müzesi","cat":"kultur","district":"Şehitkamil","lat":37.0745,"lng":37.3730,"price":2,"vibes":["fotograf","aile"],"why":["Dünyanın en büyük mozaik koleksiyonlarından biri; 'Çingene Kızı' mozaiği ikon.","Modern, iyi düzenlenmiş müze; yaklaşık iki saat ayır."],"bestTime":"Hafta içi","dur":120,"ed":9.1},
+    {"id":"gaz-kale","name":"Gaziantep Kalesi","cat":"kultur","district":"Şahinbey","lat":37.0663,"lng":37.3792,"price":1,"vibes":["fotograf","butce-dostu"],"why":["Şehrin merkezinde, restore edilmiş kale ve altındaki müze/galeri.","Çarşı gezisinin başlangıç noktası olarak mantıklı."],"bestTime":"Sabah","dur":60,"ed":7.9},
+    {"id":"gaz-bakircilar","name":"Bakırcılar Çarşısı","cat":"alisveris","district":"Şahinbey","lat":37.0645,"lng":37.3820,"price":2,"vibes":["fotograf","yerel"],"why":["Çekiç sesleri eşliğinde bakır işleyen ustalar; el yapımı hediyelik için en iyi yer.","Katmer ve menengiç kahvesi için yakın duraklar."],"bestTime":"Hafta içi öğleden önce","dur":75,"ed":8.0},
+    {"id":"gaz-mutfakmuzesi","name":"Emine Göğüş Mutfak Müzesi","cat":"kultur","district":"Şahinbey","lat":37.0644,"lng":37.3860,"price":1,"vibes":["aile","yerel"],"why":["Gaziantep mutfak kültürünü tarihi bir evde, aletleri ve sofra düzeniyle anlatıyor.","Yemekten önce/sonra gidilirse yediklerinin hikâyesi tamamlanıyor."],"bestTime":"Gün içi","dur":45,"ed":7.6},
+    {"id":"gaz-imamcagdas","name":"İmam Çağdaş","cat":"yemek","food":"kebap","district":"Şahinbey","lat":37.0654,"lng":37.3817,"price":2,"vibes":["yerel","grup"],"why":["1887'den beri aynı çarşıda, Gaziantep kebabı ve beyranın referans adreslerinden.","Ali Nazik ve kebap çeşitleri turist için ideal ilk yemek."],"mustTry":["Beyran","Ali Nazik","Kebap çeşitleri"],"bestTime":"Öğle","dur":75,"ed":9.0},
+    {"id":"gaz-beyran","name":"Sabah Beyranı (Metanet)","cat":"yemek","food":"lokanta","district":"Şahinbey","lat":37.0655,"lng":37.3806,"price":1,"vibes":["yerel","butce-dostu"],"why":["Kuzu etli, sarımsaklı, acı bir çorba; Gaziantep'te güne beyranla başlanır.","Sabah erken saatlerde en iyisi."],"mustTry":["Beyran"],"bestTime":"Sabah 07:00-10:00","dur":45,"ed":8.8},
+    {"id":"gaz-katmer","name":"Zekeriya Usta Katmer","cat":"yemek","food":"kahvalti","district":"Şahinbey","lat":37.0640,"lng":37.3830,"price":2,"vibes":["yerel","fotograf"],"why":["Antep fıstığı, kaymak ve şekerle açılan ince hamur: Gaziantep'in kahvaltı klasiği.","Gözünün önünde yapılıyor, çıtır çıtır sıcak yenir."],"mustTry":["Fıstıklı katmer"],"bestTime":"Sabah","dur":40,"ed":8.5},
+    {"id":"gaz-baklava","name":"Gaziantep Fıstıklı Baklava","cat":"yemek","food":"tatli","district":"Şahinbey","lat":37.0645,"lng":37.3805,"price":2,"vibes":["aile","grup"],"why":["Antep fıstığının en taze halini en iyi baklavayla buluşturan yerel ustalar; coğrafi işaretli ürün.","Kuru baklava, havuç dilimi ve şöbiyet de dene."],"mustTry":["Fıstıklı baklava","Şöbiyet","Havuç dilimi"],"bestTime":"İkindi","dur":35,"ed":8.6},
+    {"id":"gaz-tahmis","name":"Tahmis Kahvesi","cat":"yemek","food":"kahve","district":"Şahinbey","lat":37.0640,"lng":37.3833,"price":1,"vibes":["yerel","fotograf","butce-dostu"],"why":["Tarihi çarşının içinde menengiç kahvesi ve dibek kahvesi servis eden eski bir kahvehane.","Çarşı turunun mola yeri."],"mustTry":["Menengiç kahvesi","Dibek kahvesi"],"bestTime":"İkindi","dur":40,"ed":8.2}
+  ]
+}

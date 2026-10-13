@@ -1,0 +1,22 @@
+{
+  "slug": "antalya",
+  "name": "Antalya",
+  "region": "Akdeniz",
+  "tagline": "Antik tiyatrolar, Toros dağları, turkuaz kıyı.",
+  "intro": "Antalya'da şehir merkezi Kaleiçi etrafında döner; asıl zenginlik çevresinde: Perge, Aspendos, Termessos antik kentleri ve Çıralı'daki Yanartaş. Merkezi kolay, antik kentleri gün gezisi olarak planlamak en verimlisi.",
+  "signatureDishes": ["Piyaz", "Şiş köfte", "Hibeş", "Tandır", "Portakal"],
+  "lat": 36.8969,
+  "lng": 30.7133,
+  "places": [
+    {"id":"ant-kaleici","name":"Kaleiçi","cat":"kultur","district":"Muratpaşa","lat":36.8847,"lng":30.7056,"price":1,"vibes":["fotograf","romantik","butce-dostu"],"why":["Roma, Selçuklu ve Osmanlı katmanları aynı sokaklarda; Hadrian Kapısı ve Yivli Minare yakın.","Yat limanına inen manzara ve kafe/bar yoğunluğuyla şehir merkezinin kalbi."],"bestTime":"Akşamüstü","dur":120,"ed":9.0},
+    {"id":"ant-muze","name":"Antalya Müzesi","cat":"kultur","district":"Konyaaltı","lat":36.8890,"lng":30.6790,"price":2,"vibes":["aile","fotograf"],"why":["Perge ve bölge antik kentlerinden çıkan heykellerle Türkiye'nin önemli arkeoloji müzelerinden.","Antik kent gezilerinden önce konuya ısınmak için en iyi durak."],"bestTime":"Hafta içi","dur":90,"ed":8.8},
+    {"id":"ant-konyaalti","name":"Konyaaltı Sahili","cat":"doga","district":"Konyaaltı","lat":36.8710,"lng":30.6350,"price":1,"vibes":["aile","manzara","butce-dostu"],"why":["Kilometrelerce çakıl plaj; arkasında Toros Dağları manzarası.","Şehir merkezine yakın, ücretsiz ve yürüyüş yolu çok iyi."],"bestTime":"Sabah / gün batımı","dur":120,"ed":8.0},
+    {"id":"ant-aspendos","name":"Aspendos Antik Tiyatrosu","cat":"kultur","district":"Serik (şehir dışı)","lat":36.9390,"lng":31.1720,"price":2,"vibes":["fotograf","aile"],"why":["Dünyanın en iyi korunmuş Roma tiyatrolarından; akustiği hâlâ çalışıyor.","Yaz aylarında opera ve bale festivali sahneleniyor."],"bestTime":"Sabah erken","dur":90,"ed":9.2},
+    {"id":"ant-perge","name":"Perge Antik Kenti","cat":"kultur","district":"Aksu (şehir dışı)","lat":36.9610,"lng":30.8540,"price":2,"vibes":["fotograf","aile"],"why":["Sütunlu ana cadde ve Hellenistik kapısıyla bölgenin en kapsamlı antik kenti.","Antalya Müzesi'ndeki heykellerin geldiği yer: ikisini aynı gün gezmek mantıklı."],"bestTime":"Sabah","dur":120,"ed":8.4},
+    {"id":"ant-termessos","name":"Termessos","cat":"kultur","district":"Döşemealtı (şehir dışı)","lat":36.9770,"lng":30.4640,"price":2,"vibes":["fotograf","manzara"],"why":["Dağ başında, Büyük İskender'in bile alamadığı söylenen kayıp antik kent.","Doğa yürüyüşü + antik kent kombinasyonu; sıcakta zor, ilkbahar/sonbahar ideal."],"bestTime":"Sabah erken (ilkbahar-sonbahar)","dur":180,"ed":8.8},
+    {"id":"ant-yanartas","name":"Yanartaş (Chimaera)","cat":"doga","district":"Çıralı (şehir dışı)","lat":36.4170,"lng":30.4720,"price":1,"vibes":["fotograf","grup"],"why":["Binlerce yıldır yanan doğal gaz alevleri; en iyi akşam saatlerinde görülüyor.","Antalya'dan uzak: Çıralı/Olympos ile birleştir."],"bestTime":"Akşam","dur":120,"ed":8.6},
+    {"id":"ant-parlak","name":"Parlak Restaurant","cat":"yemek","food":"lokanta","district":"Muratpaşa","lat":36.8890,"lng":30.7020,"price":3,"vibes":["aile","yerel","grup"],"why":["Köz ateşinde pişen tavuğu ve Antalya mezeleriyle (piyaz, hibeş) şehrin köklü adreslerinden.","Bahçesinde oturmak yazın bile keyifli."],"mustTry":["Odun ateşinde piliç","Piyaz","Hibeş"],"bestTime":"Akşam","dur":90,"ed":8.3},
+    {"id":"ant-piyaz","name":"Antalya Piyazı (şiş köfte & piyaz)","cat":"yemek","food":"kebap","district":"Muratpaşa","lat":36.8940,"lng":30.7040,"price":1,"vibes":["yerel","butce-dostu","ogrenci"],"why":["Tahinli fasulye piyazı ve şiş köfte, Antalya'nın hızlı ve ucuz klasiği.","Öğle arasında tüketmek için ideal; fazla ağır değil."],"mustTry":["Şiş köfte-piyaz"],"bestTime":"Öğle","dur":45,"ed":7.9},
+    {"id":"ant-kaleicibar","name":"Kaleiçi Bar & Marina Hattı","cat":"pub","district":"Kaleiçi","lat":36.8860,"lng":30.7040,"price":3,"vibes":["gece","romantik","grup"],"why":["Marina manzaralı bar/kafeler ve canlı müzik; akşam yemeğinden sonra aynı bölgede kalıp devam edebilirsin.","Yaz akşamları en hareketli."],"bestTime":"Yaz akşamları","dur":120,"ed":7.8}
+  ]
+}
