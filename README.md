@@ -11,6 +11,7 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 - **Filtreler**: ortam (öğrenci dostu, romantik, gece hayatı, bütçe dostu…) ve bütçe.
 - **Gezi planlayıcı**: gün/tempo/ilgi/bütçeye göre otomatik plan (kahvaltı → gezi → öğle → … → gece; yakınlık + puan
   optimizasyonu, yürüme/seyahat süreleri, yemek saatleri), sonra elle düzenleme. Plan tarayıcıda saklanır.
+- **Harita görünümü**: şehir sayfasında Liste/Harita geçişi (filtreler haritaya da uygulanır, işaretçiden plana ekle); planda her günün rotası numaralı duraklar ve çizgiyle haritada. Leaflet + OpenStreetMap, API anahtarı gerekmez (yoğun trafikte kendi tile sağlayıcınıza geçin).
 - **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
   yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
 
@@ -54,5 +55,5 @@ src/app/               Next.js App Router sayfaları
 
 ## Yol haritası
 
-Harita görünümü · hesap + plan paylaşma/ortak plan · “şu an açık” (çalışma saatleri) · hava/mevsim bazlı öneri ·
+Hesap + plan paylaşma/ortak plan · “şu an açık” (çalışma saatleri) · hava/mevsim bazlı öneri ·
 kullanıcı oyları (“neden iyi” gerekçelerine) · gerçek yürüme/toplu taşıma süreleri · 81 ile genişleme · EN/DE.

@@ -3,10 +3,12 @@ import { useState } from "react";
 import { CATEGORIES, PRICE_LABEL } from "@/lib/categories";
 import { haversineKm, mapsUrl } from "@/lib/geo";
 import { fmtTime, generatePlan, scheduleDay, type Pace, type PlanPrefs } from "@/lib/itinerary";
+import { MapView } from "./MapLoader";
 import { usePlan } from "@/lib/usePlan";
 import type { Category, ScoredPlace } from "@/lib/types";
 
-export function Planner({ slug, places }: { slug: string; places: ScoredPlace[] }) {
+export function Planner({ slug, places, center }: { slug: string; places: ScoredPlace[]; center: [number, number] }) {
+  const [mapDay, setMapDay] = useState<number | null>(null);
   const { plan, setPlan, ready } = usePlan(slug);
   const byId = new Map(places.map((p) => [p.id, p]));
   const [prefs, setPrefs] = useState<PlanPrefs>({
@@ -125,9 +127,19 @@ export function Planner({ slug, places }: { slug: string; places: ScoredPlace[] 
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-lg">{d + 1}. Gün</h2>
               <span className="text-xs text-stone-500">
+                {timed.length > 0 && (
+                  <button className="text-brand font-semibold mr-2" onClick={() => setMapDay(mapDay === d ? null : d)}>
+                    {mapDay === d ? "Haritayı gizle" : "🗺️ Haritada gör"}
+                  </button>
+                )}
                 {timed.length} durak · ~{km.toFixed(1)} km{timed.length ? ` · ${fmtTime(timed[0].start)}–${fmtTime(timed[timed.length - 1].end)}` : ""}
               </span>
             </div>
+            {mapDay === d && timed.length > 0 && (
+              <div className="mt-3">
+                <MapView places={[]} route={timed.map((t) => t.place)} center={center} height="50vh" />
+              </div>
+            )}
             {timed.length === 0 && <p className="text-sm text-stone-500 py-3">Henüz durak yok.</p>}
             <ol className="mt-3 space-y-3">
               {timed.map((s, i) => (

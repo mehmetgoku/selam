@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CATEGORIES, FOOD_TYPES, PRICE_LABEL, VIBES } from "@/lib/categories";
 import { usePlan } from "@/lib/usePlan";
 import type { Category, FoodType, ScoredPlace, Vibe } from "@/lib/types";
+import { MapView } from "./MapLoader";
 import { PlaceCard } from "./PlaceCard";
 
 const chip = (active: boolean) =>
@@ -11,7 +12,8 @@ const chip = (active: boolean) =>
     active ? "bg-ink text-white border-ink" : "bg-white border-stone-300 text-stone-700 hover:border-ink"
   }`;
 
-export function CityExplorer({ slug, places }: { slug: string; places: ScoredPlace[] }) {
+export function CityExplorer({ slug, places, center }: { slug: string; places: ScoredPlace[]; center: [number, number] }) {
+  const [view, setView] = useState<"liste" | "harita">("liste");
   const [cat, setCat] = useState<Category | "hepsi">("hepsi");
   const [food, setFood] = useState<FoodType | null>(null);
   const [vibe, setVibe] = useState<Vibe | null>(null);
@@ -93,6 +95,18 @@ export function CityExplorer({ slug, places }: { slug: string; places: ScoredPla
               <option key={n} value={n}>{n === 4 ? "Her bütçe" : `En fazla ${PRICE_LABEL[n]}`}</option>
             ))}
           </select>
+          <div className="flex rounded-full border border-stone-300 bg-white overflow-hidden" role="group" aria-label="Görünüm">
+            {(["liste", "harita"] as const).map((v) => (
+              <button
+                key={v}
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1.5 ${view === v ? "bg-ink text-white" : ""}`}
+              >
+                {v === "liste" ? "☰ Liste" : "🗺️ Harita"}
+              </button>
+            ))}
+          </div>
           <Link
             href={`/sehir/${slug}/plan`}
             className="ml-auto rounded-full bg-brand text-white px-4 py-1.5 font-semibold"
@@ -106,7 +120,14 @@ export function CityExplorer({ slug, places }: { slug: string; places: ScoredPla
         <p className="text-stone-500 py-10 text-center">Bu filtrelerle mekân yok — filtreleri gevşet.</p>
       )}
 
-      {sections
+      {view === "harita" && filtered.length > 0 ? (
+        <MapView
+          places={filtered}
+          center={center}
+          inPlan={has}
+          onToggle={(id) => (has(id) ? remove(id) : add(id))}
+        />
+      ) : sections
         ? sections.map((s) => (
             <section key={s.title} className="space-y-3">
               <h2 className="text-lg font-bold">{s.title}</h2>

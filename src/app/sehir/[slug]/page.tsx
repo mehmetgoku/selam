@@ -20,7 +20,7 @@ export default async function CityPage({ params }: { params: Promise<{ slug: str
           İmza lezzetler: {city.signatureDishes.join(" · ")}
         </p>
       </section>
-      <CityExplorer slug={city.slug} places={city.places} />
+      <CityExplorer slug={city.slug} places={city.places} center={[city.lat, city.lng]} />
     </div>
   );
 }
