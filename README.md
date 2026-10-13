@@ -14,10 +14,11 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 - **Harita görünümü**: şehir sayfasında Liste/Harita geçişi (filtreler haritaya da uygulanır, işaretçiden plana ekle); planda her günün rotası numaralı duraklar ve çizgiyle haritada.
   **Google Haritalar (Maps JavaScript API)** kullanılır: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` tanımlıysa. Anahtar yoksa geliştirme/test için yedek olarak Leaflet + OpenStreetMap çalışır
   (Google verisi gösteren üretim yapısında anahtar tanımlı olmalı). Ayarlar için `.env.example`.
-- **“Şu an açık”**: kartlarda canlı durum (İstanbul saatiyle: açık/yakında kapanıyor/kapalı + açılış zamanı), listede “Şu an açık”
-  filtresi, haritada kapalı mekânlar soluk. Planda gün seçince (ya da “Başlangıç günü”) kapalı mekânlar otomatik plana
-  alınmaz, elle eklenenlerde ⚠ uyarısı çıkar. Saatler Google Places'ten `npm run ingest` ile gelir; **saati bilinmeyen
-  mekân “bilinmiyor” sayılır, tahmin edilmez** (yalnız sahil/köprü/cadde gibi açık alanlar seed'de `"hours": "24/7"`).
+- **“Şu an açık”**: İstanbul saatiyle açık/yakında kapanıyor/kapalı + açılış zamanı. Çalışma saatleri **Google'dan canlı** alınır
+  (yalnızca kullanıcı isteyince: kartta “🔎 Google puanı ve çalışma saatleri”, “Şu an açık” filtresi, planda gün seçimi) ve **yalnızca bellekte**
+  tutulur — diske/localStorage'a/sunucuya yazılmaz. Kapalı olduğu kesin mekânlar listede filtrelenir, haritada soluk görünür, otomatik plana
+  alınmaz; elle eklenenlerde ⚠ uyarısı çıkar. **Saati bilinmeyen mekân “bilinmiyor” sayılır, tahmin edilmez** (yalnız sahil/köprü/cadde
+  gibi açık alanlar seed'de `"hours": "24/7"`). Google anahtarı yoksa canlı veri sunulmaz.
 - **Plan paylaşma**: plan bağlantının içine gömülür (hesap/sunucu yok, ~300 karakter); alıcı “Bu planı kullan” ile kendi planına alır
   (mevcut planı sessizce ezmez). WhatsApp için saatli metin özeti de hazırlanır. Gelen bağlantı güvenilmez sayılır:
   bilinmeyen mekân/slot atılır, boyut sınırlıdır. Bağlantı anlık görüntüdür; canlı ortak düzenleme sunucu gerektirir (yol haritasında).
@@ -25,17 +26,17 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
   aynı planı **canlı** düzenler (2 sn'de bir senkron), mekânlara 👍 oy verir, kimlerin odada olduğunu ve son hareketleri görür.
   Değişiklikler tüm planı değil küçük **işlemler** (ekle/çıkar/taşı/oy…) olarak sunucuda sırayla uygulanır; iki kişi aynı anda
   farklı mekân eklerse ikisi de kalır. Sunucu her girdiyi doğrular (şekil, mekân kimliği, boyut sınırı, ad temizliği).
-- **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
-  yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
+- **Selam skoru**: editoryal puan + (varsa, taze ve yorumlu) **TripAdvisor** puanı (Bayes düzeltmeli, %60/%40; az yorumlu “5.0” yerler şişmez).
+  **Google puanı skora girmez** — Google içeriği saklanamadığı için yalnızca canlı rozet olarak gösterilir.
 
-> **Mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — harita Google'a geçti; ama Google Places içeriğinin (puan/saat) kalıcı saklanamaması hâlâ yayın öncesi çözülmesi gereken bir lisans konusudur.
+> **Mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — harita Google'a geçti ve Google içeriği artık saklanmıyor (yalnızca canlı); kalan lisans notları orada.
 
 ## Çalıştırma
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # sıralama, plan, ingest eşleşme testleri
+npm test           # sıralama, plan, saatler, ortak işlemler, ingest/lisans testleri
 npm run build
 ```
 
@@ -56,21 +57,29 @@ GOOGLE_MAPS_API_KEY=... TRIPADVISOR_API_KEY=... npm run ingest            # tüm
 GOOGLE_MAPS_API_KEY=... npm run ingest -- istanbul                        # tek şehir
 ```
 
-`scripts/ingest.ts`, `data/cities/*.json` içindeki her mekânı Google Places API (New) ve TripAdvisor Content API ile
-eşler (seed koordinatından 1.5 km'den uzak sonuçlar reddedilir) ve `data/signals/<şehir>.json` dosyasına yazar.
-Uygulama bu dosyayı otomatik birleştirir; yoksa editoryal puana düşer.
+`scripts/ingest.ts`, `data/cities/*.json` içindeki her mekânı eşler (seed koordinatından 1.5 km'den uzak sonuçlar reddedilir; >300 m sapmada
+seed'i düzeltmeniz için uyarı basılır) ve `data/signals/<şehir>.json` dosyasına yazar:
+
+| Kaynak | Saklanan | Not |
+|---|---|---|
+| Google Places | **yalnızca Place ID** | Puan/yorum/saat/koordinat saklanmaz (lisans); canlı çekilir (`src/lib/live.ts`) |
+| TripAdvisor | puan, yorum sayısı, `fetchedAt`, bağlantı | `SIGNAL_MAX_AGE_DAYS` (varsayılan 30) günden eski sinyal skora girmez; kartta TripAdvisor bağlantısı atıf olarak durur |
+
+`src/lib/data.ts` `mergeSignals` yalnızca bu alanları birleştirir; sinyal dosyasına başka Google alanı sızsa bile yok sayılır (test: `sinyal birleştirme`).
 
 > **Not:** `data/cities/*.json` editoryal seed verisidir (gerekçeler, kategori, tahmini koordinatlar). Koordinatlar ve
 > mekân adları ingest ile doğrulanmalı; bazı kayıtlar (örn. “Alsancak köftecileri”) bölge/yemek bazlı genel girdilerdir.
-> Google/TripAdvisor şartları puan/yorum verisinin uzun süreli önbelleğini sınırlar ve kaynak atfı ister; üretimde
-> `fetchedAt` ile yenileme ve atıf (logo/bağlantı) eklenmelidir. `data/signals/` bu yüzden `.gitignore`'dadır.
+> **Doğrulanması gereken:** TripAdvisor Content API'nin güncel önbellekleme/atıf şartları (logo zorunluluğu dahil) — bu repo yalnızca metin atfı ve bağlantı ekler.
+> **Maliyet:** canlı Google çağrıları faturalanır (puan/saat alanları pahalı SKU). Bu yüzden yalnızca kullanıcı eylemiyle tetiklenir ve oturum belleğinde tekrar kullanılır;
+> Maps JS anahtarında “Places API (New)” de etkin olmalı ve bütçe uyarısı kurulmalıdır. `data/signals/` `.gitignore`'dadır.
 
 ## Yapı
 
 ```
 data/cities/*.json     editoryal seed (şehir + mekân + “neden iyi”)
-scripts/ingest.ts      Google Places + TripAdvisor çekici
-src/lib/rank.ts        skor (Bayes + editoryal), localness
+scripts/ingest.ts      Google Place ID + TripAdvisor çekici
+src/lib/live.ts        canlı Google puan/saat (yalnızca bellek)
+src/lib/rank.ts        skor (editoryal + TripAdvisor)
 src/lib/itinerary.ts   otomatik plan + saatlendirme
 src/components/        CityExplorer, PlaceCard, Planner
 src/app/               Next.js App Router sayfaları

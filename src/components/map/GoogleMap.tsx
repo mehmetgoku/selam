@@ -1,29 +1,11 @@
 /// <reference types="@types/google.maps" />
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { loadGoogle } from "@/lib/googleMaps";
 import { fitKey, pinElement, popupContent, type MapProps } from "./shared";
 
-const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 /** Gelişmiş işaretçiler Map ID ister; "DEMO_MAP_ID" yalnızca geliştirme içindir — üretimde kendi Map ID'ni tanımla. */
 const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "DEMO_MAP_ID";
-
-let loading: Promise<void> | null = null;
-/** Google Maps JS API'sini bir kez yükler (bağımlılık eklemeden, resmi dinamik yükleme yöntemiyle). */
-function loadGoogle(): Promise<void> {
-  if (typeof google !== "undefined" && typeof google.maps?.importLibrary === "function") return Promise.resolve();
-  loading ??= new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(KEY)}&v=weekly&loading=async&language=tr&region=TR`;
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => {
-      loading = null;
-      reject(new Error("Google Haritalar yüklenemedi"));
-    };
-    document.head.appendChild(s);
-  });
-  return loading;
-}
 
 export default function GoogleMap({ places, center, route, inPlan, dim, onToggle, height = "70vh" }: MapProps) {
   const host = useRef<HTMLDivElement>(null);

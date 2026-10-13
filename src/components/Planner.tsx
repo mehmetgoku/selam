@@ -9,12 +9,15 @@ import type { Op } from "@/lib/collab";
 import { decodePlan, encodePlan, shareText } from "@/lib/sharePlan";
 import { usePlan } from "@/lib/usePlan";
 import { useRoom } from "@/lib/useRoom";
+import { ensureLive, useLive, waitLive } from "@/lib/live";
 import type { Category, Plan, ScoredPlace } from "@/lib/types";
 
 export function Planner({ slug, cityName, places, center }: { slug: string; cityName: string; places: ScoredPlace[]; center: [number, number] }) {
   const [shared, setShared] = useState<Plan | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<number | null>(null);
+  const live = useLive();
+  const hoursOf = (p: ScoredPlace) => live.get(p.google?.id)?.hours ?? p.hours;
   const [roomId, setRoomId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const local = usePlan(slug);
@@ -93,9 +96,14 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
       interests: p.interests.includes(c) ? p.interests.filter((x) => x !== c) : [...p.interests, c],
     }));
 
-  const auto = () => {
+  const auto = async () => {
     if (roomId && plan.days.some((d) => d.stops.length) && !window.confirm("Ortak plan baştan oluşturulacak ve herkesin planı değişecek. Devam edilsin mi?")) return;
-    dispatch({ t: "replace", plan: generatePlan(places, prefs) });
+    // Başlangıç günü seçildiyse çalışma saatleri Google'dan canlı alınır (bellekte; kaydedilmez), sonra plan kurulur.
+    if (prefs.startDow != null) {
+      ensureLive(places.map((p) => p.google?.id));
+      await waitLive(places.map((p) => p.google?.id));
+    }
+    dispatch({ t: "replace", plan: generatePlan(places.map((p) => ({ ...p, hours: hoursOf(p) })), prefs) });
   };
 
   const move = (id: string, dir: -1 | 1) => dispatch({ t: "move", placeId: id, dir });
@@ -130,6 +138,13 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
       flash("Kopyalanamadı — adres çubuğundaki bağlantıyı gönder");
     }
   };
+
+  const needsLive = plan.days.some((d) => d.dow !== undefined);
+  const plannedGoogleIds = plan.days.flatMap((d) => d.stops.map((st) => byId.get(st.placeId)?.google?.id));
+  useEffect(() => {
+    if (needsLive) ensureLive(plannedGoogleIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsLive, plannedGoogleIds.join(",")]);
 
   const planned = new Set(plan.days.flatMap((d) => d.stops.map((s) => s.placeId)));
 
@@ -356,7 +371,7 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
                     </p>
                     {(() => {
                       if (day.dow === undefined) return null;
-                      const v = checkVisit(s.place.hours, day.dow, s.start, s.end);
+                      const v = checkVisit(hoursOf(s.place), day.dow, s.start, s.end);
                       return v.detail ? (
                         <p className="text-xs font-semibold text-red-700 bg-red-50 rounded px-2 py-1 my-1 inline-block">⚠ {v.detail}</p>
                       ) : null;

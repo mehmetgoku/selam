@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadAllCities, loadCity } from "./data";
+import { loadAllCities, loadCity, mergeSignals } from "./data";
 import { haversineKm } from "./geo";
 import { generatePlan, scheduleDay, type PlanPrefs } from "./itinerary";
 import { rankPlaces, scorePlace } from "./rank";
@@ -11,21 +11,51 @@ const base: Place = {
 };
 
 describe("rank", () => {
+  const ta = (rating: number, count: number, fetchedAt?: string) => ({ rating, count, fetchedAt });
   it("harici veri yokken editoryal puanı kullanır", () => {
     expect(scorePlace(base).score).toBe(7);
   });
-  it("az yorumlu mükemmel puan, çok yorumlu iyi puanı geçemez", () => {
-    const few = scorePlace({ ...base, google: { rating: 5, count: 3 } });
-    const many = scorePlace({ ...base, google: { rating: 4.6, count: 5000 } });
+  it("az yorumlu mükemmel TripAdvisor puanı, çok yorumlu iyi puanı geçemez", () => {
+    const few = scorePlace({ ...base, tripadvisor: ta(5, 3) });
+    const many = scorePlace({ ...base, tripadvisor: ta(4.6, 5000) });
     expect(many.score).toBeGreaterThan(few.score);
   });
-  it("iki kaynak varsa localness hesaplar", () => {
-    const s = scorePlace({ ...base, google: { rating: 4.5, count: 900 }, tripadvisor: { rating: 4.5, count: 100 } });
-    expect(s.localness).toBeCloseTo(0.9);
+  it("Google verisi skora GİRMEZ (saklanamayan içerik)", () => {
+    const withGoogle = { ...base, google: { id: "ChIJabcdefghij", rating: 1, count: 99999 } } as unknown as Place;
+    expect(scorePlace(withGoogle).score).toBe(scorePlace(base).score);
+  });
+  it("bayat TripAdvisor sinyali yok sayılır, taze olan sayılır", () => {
+    const now = Date.parse("2026-10-13T00:00:00Z");
+    const fresh = scorePlace({ ...base, tripadvisor: ta(5, 2000, "2026-10-01T00:00:00Z") }, now);
+    const stale = scorePlace({ ...base, tripadvisor: ta(5, 2000, "2026-06-01T00:00:00Z") }, now);
+    expect(fresh.score).toBeGreaterThan(base.ed);
+    expect(stale.score).toBe(base.ed);
   });
   it("puana göre sıralar", () => {
     const r = rankPlaces([{ ...base, id: "a", ed: 5 }, { ...base, id: "b", ed: 9 }]);
     expect(r[0].id).toBe("b");
+  });
+});
+
+describe("sinyal birleştirme (lisans güvencesi)", () => {
+  it("yalnızca Google Place ID + TripAdvisor alınır; sızan Google puanı/saati/koordinatı reddedilir", () => {
+    const leaked = {
+      google: { id: "ChIJ-valid_PlaceId1", rating: 4.9, count: 100, url: "https://maps.google.com/x" },
+      hours: [{ day: 1, open: 0, close: 60, closeDay: 1 }],
+      lat: 1,
+      lng: 2,
+      tripadvisor: { rating: 4.5, count: 80, fetchedAt: "2026-10-01T00:00:00Z" },
+    };
+    const m = mergeSignals(base, leaked as never);
+    expect(m.google).toEqual({ id: "ChIJ-valid_PlaceId1" });
+    expect(m.hours).toBeUndefined();
+    expect([m.lat, m.lng]).toEqual([base.lat, base.lng]);
+    expect(m.tripadvisor?.rating).toBe(4.5);
+  });
+  it("geçersiz Place ID ve bozuk TripAdvisor kaydı atılır", () => {
+    const m = mergeSignals(base, { google: { id: "../etc" }, tripadvisor: { rating: "x" } } as never);
+    expect(m.google).toBeUndefined();
+    expect(m.tripadvisor).toBeUndefined();
   });
 });
 
@@ -77,7 +107,7 @@ describe("itinerary", () => {
 });
 
 describe("ingest eşleşmesi", () => {
-  it("seed koordinatından uzak Google sonucunu reddeder, yakın olanı alır", async () => {
+  it("seed koordinatından uzak Google sonucunu reddeder; yakın olanda yalnızca Place ID döner", async () => {
     process.env.GOOGLE_MAPS_API_KEY = "k";
     const { googleLookup } = await import("../../scripts/ingest");
     const mk = (lat: number) =>
@@ -87,12 +117,23 @@ describe("ingest eşleşmesi", () => {
         )) as unknown as typeof fetch;
     expect(await googleLookup(base, "T", mk(45))).toBeNull();
     const ok = await googleLookup(base, "T", mk(41.001));
-    expect(ok?.signal.rating).toBe(4.5);
+    expect(ok?.ref).toEqual({ id: "g1" }); // puan/yorum yanıtta olsa bile döndürülmez/saklanmaz
+    expect(Object.keys(ok!.ref)).toEqual(["id"]);
+  });
+  it("Google isteği yalnızca id ve konum alanlarını ister (içerik alanı istenmez)", async () => {
+    process.env.GOOGLE_MAPS_API_KEY = "k";
+    const { googleLookup } = await import("../../scripts/ingest");
+    let mask = "";
+    const f = (async (_u: string, init: RequestInit) => {
+      mask = (init.headers as Record<string, string>)["X-Goog-FieldMask"];
+      return new Response(JSON.stringify({ places: [] }));
+    }) as unknown as typeof fetch;
+    await googleLookup(base, "T", f);
+    expect(mask).toBe("places.id,places.location");
   });
 });
 
-import { checkVisit, istanbulNow, openStatus, statusText, type Period } from "./hours";
-import { parseGoogleHours } from "../../scripts/ingest";
+import { checkVisit, istanbulNow, openStatus, periodsToHours, statusText, type Period } from "./hours";
 
 // Pzt-Cmt 09:00-17:00, Pazar kapalı; Cuma-Cmt barı 20:00 → ertesi 02:00
 const museum: Period[] = [1, 2, 3, 4, 5, 6].map((d) => ({ day: d, open: 540, close: 1020, closeDay: d }));
@@ -129,12 +170,12 @@ describe("hours", () => {
   it("İstanbul saati UTC+3", () => {
     expect(istanbulNow(new Date("2026-10-13T21:30:00Z"))).toEqual({ dow: 3, minute: 30 }); // Çarşamba 00:30
   });
-  it("Google periyotlarını dönüştürür", () => {
-    expect(parseGoogleHours([{ open: { day: 1, hour: 9 }, close: { day: 1, hour: 17, minute: 30 } }])).toEqual([
+  it("Google periyotlarını (canlı veri) dönüştürür", () => {
+    expect(periodsToHours([{ open: { day: 1, hour: 9 }, close: { day: 1, hour: 17, minute: 30 } }])).toEqual([
       { day: 1, open: 540, close: 1050, closeDay: 1 },
     ]);
-    expect(parseGoogleHours([{ open: { day: 0, hour: 0 } }])).toBe("24/7");
-    expect(parseGoogleHours(undefined)).toBeUndefined();
+    expect(periodsToHours([{ open: { day: 0, hour: 0 } }])).toBe("24/7");
+    expect(periodsToHours(undefined)).toBeUndefined();
   });
 });
 

@@ -1,41 +1,23 @@
 /**
- * Google Places (New) + TripAdvisor Content API'den puan/yorum sinyallerini çeker.
+ * Mekânları Google Places (yalnızca Place ID) ve TripAdvisor Content API (puan/yorum) ile eşler.
  * Resmi API'ler kullanılır (scraping yok). Çıktı: data/signals/<şehir>.json
  *
  *   GOOGLE_MAPS_API_KEY=... TRIPADVISOR_API_KEY=... npm run ingest [-- istanbul izmir]
  *
- * Anahtarlardan biri yoksa o kaynak atlanır. Eşleşme, seed koordinatına 1.5 km'den yakın
- * sonuçlarla sınırlıdır (yanlış mekânla eşleşmeyi önlemek için).
+ * LİSANS: Google'dan yalnızca Place ID saklanır; puan/yorum/saat/koordinat DİSKE YAZILMAZ (canlı çekilir, bkz. src/lib/live.ts).
+ * Eşleşme, seed koordinatına 1.5 km'den yakın sonuçlarla sınırlıdır; sapma >300 m ise seed'i düzeltmeniz için uyarı basılır.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { haversineKm } from "../src/lib/geo";
-import type { Hours, Period } from "../src/lib/hours";
-import type { City, Place, SourceSignal } from "../src/lib/types";
+import type { City, GoogleRef, Place, SourceSignal } from "../src/lib/types";
 
 const ROOT = path.join(import.meta.dirname, "..");
 const MAX_KM = 1.5;
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const TA_KEY = process.env.TRIPADVISOR_API_KEY;
 
-type Out = Record<string, { google?: SourceSignal; tripadvisor?: SourceSignal; lat?: number; lng?: number; hours?: Hours }>;
-
-/** Google `regularOpeningHours.periods` → sade Hours. Kapanışsız tek dönem = 7/24. */
-export function parseGoogleHours(periods?: { open?: { day: number; hour: number; minute?: number }; close?: { day: number; hour: number; minute?: number } }[]): Hours | undefined {
-  if (!periods?.length) return undefined;
-  if (periods.length === 1 && periods[0].open && !periods[0].close) return "24/7";
-  const out: Period[] = [];
-  for (const p of periods) {
-    if (!p.open || !p.close) continue;
-    out.push({
-      day: p.open.day,
-      open: p.open.hour * 60 + (p.open.minute ?? 0),
-      close: p.close.hour * 60 + (p.close.minute ?? 0),
-      closeDay: p.close.day,
-    });
-  }
-  return out.length ? out : undefined;
-}
+type Out = Record<string, { google?: GoogleRef; tripadvisor?: SourceSignal }>;
 
 export async function googleLookup(p: Place, cityName: string, fetchFn = fetch) {
   const res = await fetchFn("https://places.googleapis.com/v1/places:searchText", {
@@ -43,7 +25,7 @@ export async function googleLookup(p: Place, cityName: string, fetchFn = fetch) 
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_KEY!,
-      "X-Goog-FieldMask": "places.id,places.displayName,places.rating,places.userRatingCount,places.location,places.googleMapsUri,places.regularOpeningHours.periods",
+      "X-Goog-FieldMask": "places.id,places.location",
     },
     body: JSON.stringify({
       textQuery: `${p.name} ${p.district} ${cityName}`,
@@ -58,19 +40,9 @@ export async function googleLookup(p: Place, cityName: string, fetchFn = fetch) 
   const hit = data.places?.find(
     (g) => g.location && haversineKm(p, { lat: g.location.latitude, lng: g.location.longitude }) <= MAX_KM,
   );
-  if (!hit?.rating) return null;
-  return {
-    signal: {
-      rating: hit.rating,
-      count: hit.userRatingCount ?? 0,
-      id: hit.id,
-      url: hit.googleMapsUri,
-      fetchedAt: new Date().toISOString(),
-    } satisfies SourceSignal,
-    lat: hit.location.latitude as number,
-    lng: hit.location.longitude as number,
-    hours: parseGoogleHours(hit.regularOpeningHours?.periods),
-  };
+  if (!hit) return null;
+  const driftKm = haversineKm(p, { lat: hit.location.latitude, lng: hit.location.longitude });
+  return { ref: { id: hit.id as string } satisfies GoogleRef, driftKm };
 }
 
 export async function tripadvisorLookup(p: Place, cityName: string, fetchFn = fetch) {
@@ -124,8 +96,8 @@ async function main() {
         if (GOOGLE_KEY) {
           const g = await googleLookup(place, city.name);
           if (g) {
-            Object.assign(entry, { google: g.signal, lat: g.lat, lng: g.lng });
-            if (g.hours) entry.hours = g.hours; // seed'deki "24/7" varsayımı Google yanıtıyla ezilir
+            entry.google = g.ref; // yalnızca Place ID
+            if (g.driftKm > 0.3) console.warn(`  ! ${place.name}: seed koordinatı Google'dan ${Math.round(g.driftKm * 1000)} m farklı — data/cities/${slug}.json'ı kontrol edin`);
           }
         }
         if (TA_KEY) {
@@ -133,7 +105,7 @@ async function main() {
           if (t) entry.tripadvisor = t;
         }
         out[place.id] = entry;
-        console.log(`✓ ${slug}/${place.name}`, entry.google?.rating ?? "-", entry.tripadvisor?.rating ?? "-");
+        console.log(`✓ ${slug}/${place.name}`, entry.google?.id ? "placeId✓" : "-", entry.tripadvisor?.rating ?? "-");
       } catch (e) {
         console.warn(`✗ ${slug}/${place.name}: ${(e as Error).message}`);
       }

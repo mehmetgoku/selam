@@ -1,6 +1,8 @@
+"use client";
 import { catEmoji, catLabel, foodLabel, PRICE_LABEL, vibeLabel } from "@/lib/categories";
 import { mapsUrl } from "@/lib/geo";
 import { openStatus, statusText, type Now } from "@/lib/hours";
+import { ensureLive, useLive } from "@/lib/live";
 import type { ScoredPlace } from "@/lib/types";
 
 export function PlaceCard({
@@ -16,8 +18,13 @@ export function PlaceCard({
   onToggle?: () => void;
   now?: Now | null;
 }) {
-  const { google, tripadvisor } = place;
-  const st = now ? openStatus(place.hours, now) : null;
+  const { tripadvisor } = place;
+  const live = useLive();
+  const gid = place.google?.id;
+  const liveData = live.get(gid);
+  const liveState = live.state(gid);
+  // Canlı Google saati varsa o; yoksa editoryal "24/7" (açık alan) bilgisi
+  const st = now ? openStatus(liveData?.hours ?? place.hours, now) : null;
   const stText = st && now ? statusText(st, now) : null;
   return (
     <article className="rounded-2xl border border-stone-200 bg-white p-4 flex flex-col gap-3">
@@ -54,6 +61,26 @@ export function PlaceCard({
         </p>
       )}
 
+      {gid && live.available && (
+        <div className="text-xs text-stone-600">
+          {liveState === "done" && liveData ? (
+            <span title="Google'dan canlı alındı; kaydedilmez">
+              <strong>Google</strong>{" "}
+              {liveData.rating !== undefined ? `★ ${liveData.rating.toFixed(1)} (${liveData.count ?? 0} yorum)` : "puan yok"} · canlı
+              {liveData.hours === undefined && " · çalışma saati yok"}
+            </span>
+          ) : liveState === "loading" ? (
+            <span>Google’dan alınıyor…</span>
+          ) : liveState === "error" ? (
+            <button className="underline" onClick={() => ensureLive([gid])}>Google verisi alınamadı — tekrar dene</button>
+          ) : (
+            <button className="underline hover:text-brand" onClick={() => ensureLive([gid])}>
+              🔎 Google puanı ve çalışma saatleri
+            </button>
+          )}
+        </div>
+      )}
+
       <div>
         <p className="text-xs font-semibold text-stone-500 mb-1">Neden iyi?</p>
         <ul className="space-y-1 text-sm text-stone-700 list-disc pl-4">
@@ -81,11 +108,12 @@ export function PlaceCard({
       <footer className="mt-auto flex items-center justify-between gap-2 text-xs text-stone-500">
         <span>
           🕐 {place.bestTime} · ~{place.dur} dk
-          {(google || tripadvisor) && (
+          {tripadvisor && (
             <>
-              {" "}
-              {google && <>· G {google.rating.toFixed(1)} ({google.count})</>}
-              {tripadvisor && <> · TA {tripadvisor.rating.toFixed(1)} ({tripadvisor.count})</>}
+              {" "}· {tripadvisor.url ? (
+                <a href={tripadvisor.url} target="_blank" rel="noopener noreferrer" className="underline">TripAdvisor</a>
+              ) : "TripAdvisor"}{" "}
+              {tripadvisor.rating.toFixed(1)} ({tripadvisor.count})
             </>
           )}
         </span>

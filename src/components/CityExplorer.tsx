@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { CATEGORIES, FOOD_TYPES, PRICE_LABEL, VIBES } from "@/lib/categories";
 import { openStatus } from "@/lib/hours";
+import { ensureLive, useLive } from "@/lib/live";
 import { useNow } from "@/lib/useNow";
 import { usePlan } from "@/lib/usePlan";
 import type { Category, FoodType, ScoredPlace, Vibe } from "@/lib/types";
@@ -22,14 +23,17 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
   const [maxPrice, setMaxPrice] = useState<1 | 2 | 3 | 4>(4);
   const [openOnly, setOpenOnly] = useState(false);
   const now = useNow();
+  const live = useLive();
+  /** Etkin çalışma saati: canlı Google saati (varsa) yoksa editoryal "24/7". Google saati hiçbir yere kaydedilmez. */
+  const hoursOf = useCallback((p: ScoredPlace) => live.get(p.google?.id)?.hours ?? p.hours, [live.version]); // eslint-disable-line react-hooks/exhaustive-deps
   const { has, add, remove, count } = usePlan(slug);
 
   const isClosed = useCallback(
     (id: string) => {
       const p = places.find((x) => x.id === id);
-      return !!now && !!p && openStatus(p.hours, now).state === "closed";
+      return !!now && !!p && openStatus(hoursOf(p), now).state === "closed";
     },
-    [places, now],
+    [places, now, hoursOf],
   );
 
   const filtered = useMemo(
@@ -40,9 +44,9 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
           (!food || p.food === food) &&
           (!vibe || p.vibes.includes(vibe)) &&
           p.price <= maxPrice &&
-          (!openOnly || !now || openStatus(p.hours, now).state !== "closed"),
+          (!openOnly || !now || openStatus(hoursOf(p), now).state !== "closed"),
       ),
-    [places, cat, food, vibe, maxPrice, openOnly, now],
+    [places, cat, food, vibe, maxPrice, openOnly, now, hoursOf],
   );
 
   const card = (p: ScoredPlace, rank?: number) => (
@@ -110,9 +114,13 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
           </select>
           <button
             aria-pressed={openOnly}
-            onClick={() => setOpenOnly(!openOnly)}
+            onClick={() => {
+              const next = !openOnly;
+              setOpenOnly(next);
+              if (next) ensureLive(places.map((p) => p.google?.id)); // kullanıcı isteğiyle: saatleri Google'dan canlı al
+            }}
             className={chip(openOnly)}
-            title="Kapalı olduğu kesin olan mekânları gizler; saati bilinmeyenler listede kalır"
+            title="Kapalı olduğu kesin olan mekânları gizler; saati bilinmeyenler listede kalır. Saatler Google'dan canlı alınır."
           >
             🟢 Şu an açık
           </button>
@@ -141,9 +149,9 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
         <p className="text-xs text-stone-500">
           İstanbul saatiyle {String(Math.floor(now.minute / 60)).padStart(2, "0")}:{String(now.minute % 60).padStart(2, "0")}.{" "}
           {(() => {
-            const unknown = filtered.filter((p) => openStatus(p.hours, now).state === "unknown").length;
+            const unknown = filtered.filter((p) => openStatus(hoursOf(p), now).state === "unknown").length;
             return unknown
-              ? `${unknown} mekânın çalışma saati henüz bilinmiyor, bu yüzden listede kaldı (saatler Google'dan "npm run ingest" ile gelir).`
+              ? `${unknown} mekânın çalışma saati bilinmiyor, bu yüzden listede kaldı. Saatler Google'dan canlı alınır${live.available ? "" : " (Google anahtarı tanımlı değil)"}; kaydedilmez.`
               : "Listedeki tüm mekânların saati biliniyor.";
           })()}
         </p>

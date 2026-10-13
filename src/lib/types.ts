@@ -24,12 +24,21 @@ export type Vibe =
   | "butce-dostu"
   | "fotograf";
 
+/** TripAdvisor sinyali (saklanabilir; `fetchedAt` ile bayatlık kontrolü yapılır). */
 export interface SourceSignal {
   rating: number; // 1-5
   count: number; // yorum sayısı
-  id?: string; // google place id / tripadvisor location id
+  id?: string; // tripadvisor location id
   url?: string;
   fetchedAt?: string;
+}
+
+/**
+ * Google'dan YALNIZCA Place ID saklanır (Google şartları başka içeriğin kalıcı saklanmasını kısıtlar).
+ * Puan/yorum sayısı/saatler kullanıcı istediğinde canlı çekilir ve asla diske yazılmaz.
+ */
+export interface GoogleRef {
+  id: string;
 }
 
 export interface Place {
@@ -55,7 +64,7 @@ export interface Place {
   when?: "sunrise" | "sunset";
   /** çalışma saatleri (ingest ile gelir; açık alanlar için "24/7") */
   hours?: Hours;
-  google?: SourceSignal;
+  google?: GoogleRef;
   tripadvisor?: SourceSignal;
 }
 
@@ -73,8 +82,6 @@ export interface City {
 
 export interface ScoredPlace extends Place {
   score: number; // 0-10
-  /** 0-1: yorumlar yerel mi turist mi ağırlıklı (iki kaynak varsa) */
-  localness?: number;
 }
 
 export interface PlanStop {

@@ -90,3 +90,25 @@ export function checkVisit(hours: Hours | undefined, dow: number, start: number,
   }
   return { state: "ok" };
 }
+
+/**
+ * Google Places `regularOpeningHours.periods` → sade Hours (canlı çekilen veriden; asla saklanmaz).
+ * Kapanışsız tek dönem = 7/24. Boş/bilinmiyorsa undefined.
+ */
+export function periodsToHours(
+  periods?: { open?: { day: number; hour: number; minute?: number }; close?: { day: number; hour: number; minute?: number } | null }[] | null,
+): Hours | undefined {
+  if (!periods?.length) return undefined;
+  if (periods.length === 1 && periods[0].open && !periods[0].close) return "24/7";
+  const out: Period[] = [];
+  for (const p of periods) {
+    if (!p.open || !p.close) continue;
+    out.push({
+      day: p.open.day,
+      open: p.open.hour * 60 + (p.open.minute ?? 0),
+      close: p.close.hour * 60 + (p.close.minute ?? 0),
+      closeDay: p.close.day,
+    });
+  }
+  return out.length ? out : undefined;
+}
