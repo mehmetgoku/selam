@@ -1,14 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CATEGORIES, PRICE_LABEL } from "@/lib/categories";
 import { haversineKm, mapsUrl } from "@/lib/geo";
 import { checkVisit, DAY_NAMES } from "@/lib/hours";
 import { fmtTime, generatePlan, scheduleDay, type Pace, type PlanPrefs } from "@/lib/itinerary";
 import { MapView } from "./MapLoader";
+import { decodePlan, encodePlan, shareText } from "@/lib/sharePlan";
 import { usePlan } from "@/lib/usePlan";
-import type { Category, ScoredPlace } from "@/lib/types";
+import type { Category, Plan, ScoredPlace } from "@/lib/types";
 
-export function Planner({ slug, places, center }: { slug: string; places: ScoredPlace[]; center: [number, number] }) {
+export function Planner({ slug, cityName, places, center }: { slug: string; cityName: string; places: ScoredPlace[]; center: [number, number] }) {
+  const [shared, setShared] = useState<Plan | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<number | null>(null);
   const { plan, setPlan, ready } = usePlan(slug);
   const byId = new Map(places.map((p) => [p.id, p]));
@@ -21,6 +24,53 @@ export function Planner({ slug, places, center }: { slug: string; places: Scored
     startDow: null,
   });
   const [adding, setAdding] = useState<number | null>(null);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("p");
+    if (raw) setShared(decodePlan(raw, new Set(places.map((p) => p.id))));
+  }, [places]);
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+  const shareUrl = () => `${window.location.origin}${window.location.pathname}?p=${encodeURIComponent(encodePlan(plan))}`;
+  const doShare = async () => {
+    const url = shareUrl();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${cityName} gezi planım`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      flash("Bağlantı kopyalandı");
+    } catch {
+      flash("Kopyalanamadı — adres çubuğundaki bağlantıyı kullan");
+      window.history.replaceState(null, "", url);
+    }
+  };
+  const whatsappHref = () => {
+    const days = plan.days
+      .filter((d) => d.stops.length)
+      .map((day, i) => ({
+        label: `${i + 1}. Gün${day.dow !== undefined ? ` · ${DAY_NAMES[day.dow]}` : ""}`,
+        lines: scheduleDay(
+          day.stops.flatMap((st) => {
+            const place = byId.get(st.placeId);
+            return place ? [{ place, slot: st.slot }] : [];
+          }),
+        ).map((t) => `${fmtTime(t.start)} ${t.place.name}`),
+      }));
+    return `https://wa.me/?text=${encodeURIComponent(shareText(cityName, days, shareUrl()))}`;
+  };
+  const adoptShared = () => {
+    if (!shared) return;
+    const hasOwn = plan.days.some((d) => d.stops.length);
+    if (hasOwn && !window.confirm("Mevcut planın silinip paylaşılan planla değiştirilecek. Devam edilsin mi?")) return;
+    setPlan(() => shared);
+    setShared(null);
+    window.history.replaceState(null, "", window.location.pathname);
+  };
 
   const toggleInterest = (c: Category) =>
     setPrefs((p) => ({
@@ -60,6 +110,23 @@ export function Planner({ slug, places, center }: { slug: string; places: Scored
 
   return (
     <div className="space-y-6">
+      {shared && (
+        <section className="rounded-2xl bg-brand-soft border border-brand/30 p-4 space-y-2">
+          <h2 className="font-bold">🔗 Sana bir plan paylaşıldı</h2>
+          <p className="text-sm text-stone-700">
+            {shared.days.length} gün · {shared.days.reduce((n, d) => n + d.stops.length, 0)} durak:{" "}
+            {shared.days.flatMap((d) => d.stops).slice(0, 4).map((st) => byId.get(st.placeId)?.name).join(", ")}…
+          </p>
+          <div className="flex gap-2">
+            <button onClick={adoptShared} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
+              Bu planı kullan
+            </button>
+            <button onClick={() => setShared(null)} className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm">
+              Kapat
+            </button>
+          </div>
+        </section>
+      )}
       <section className="rounded-2xl bg-white border border-stone-200 p-4 space-y-4">
         <h2 className="font-bold">⚡ Otomatik plan oluştur</h2>
         <div className="flex flex-wrap gap-4 text-sm">
@@ -224,6 +291,30 @@ export function Planner({ slug, places, center }: { slug: string; places: Scored
           </section>
         );
       })}
+      {ready && plan.days.some((d) => d.stops.length) && (
+        <section className="rounded-2xl bg-white border border-stone-200 p-4 flex flex-wrap items-center gap-3">
+          <h2 className="font-bold mr-auto">Planı paylaş</h2>
+          <button onClick={doShare} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
+            🔗 Bağlantıyı paylaş / kopyala
+          </button>
+          <a
+            href={whatsappHref()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-semibold hover:border-ink"
+          >
+            WhatsApp
+          </a>
+          <p className="basis-full text-xs text-stone-500">
+            Bağlantı planın o anki halini içerir (sunucuda saklanmaz); sonradan yaptığın değişiklikler için yeniden paylaş.
+          </p>
+        </section>
+      )}
+      {toast && (
+        <div role="status" className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-ink text-white px-4 py-2 text-sm shadow-lg">
+          {toast}
+        </div>
+      )}
       {ready && (
         <button onClick={addDay} className="text-sm text-brand font-semibold">+ Gün ekle</button>
       )}

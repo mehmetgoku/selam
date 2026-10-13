@@ -149,3 +149,25 @@ describe("saat farkındalıklı plan", () => {
     expect(generatePlan(ist.places, prefs).days[0].dow).toBeUndefined();
   });
 });
+
+import { decodePlan, encodePlan } from "./sharePlan";
+
+describe("plan paylaşımı", () => {
+  const ist = loadCity("istanbul")!;
+  const ids = new Set(ist.places.map((p) => p.id));
+  const prefs: PlanPrefs = { days: 2, pace: "yogun", interests: ["kultur", "doga", "eglence", "pub", "alisveris"], vibes: [], maxPrice: 4, startDow: 2 };
+
+  it("encode → decode aynı planı verir (gün, slot dahil)", () => {
+    const plan = generatePlan(ist.places, prefs);
+    expect(decodePlan(encodePlan(plan), ids)).toEqual(plan);
+  });
+  it("bilinmeyen/yinelenen mekân ve geçersiz slot atılır", () => {
+    const d = decodePlan("1.ist-van@yok,ist-van,sahte-id,<script>", ids);
+    expect(d).toEqual({ days: [{ stops: [{ placeId: "ist-van" }], dow: 1 }] });
+  });
+  it("çöp girdiyi ve boş planı reddeder", () => {
+    for (const bad of ["", "abc", "9.ist-van", "x.ist-van", ".ist-van", "-.sahte", "-." + "a".repeat(5000)])
+      expect(decodePlan(bad, ids)).toBeNull();
+    expect(decodePlan(Array(20).fill("-.ist-van").join("~"), ids)).toBeNull();
+  });
+});

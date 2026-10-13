@@ -16,6 +16,9 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
   filtresi, haritada kapalı mekânlar soluk. Planda gün seçince (ya da “Başlangıç günü”) kapalı mekânlar otomatik plana
   alınmaz, elle eklenenlerde ⚠ uyarısı çıkar. Saatler Google Places'ten `npm run ingest` ile gelir; **saati bilinmeyen
   mekân “bilinmiyor” sayılır, tahmin edilmez** (yalnız sahil/köprü/cadde gibi açık alanlar seed'de `"hours": "24/7"`).
+- **Plan paylaşma**: plan bağlantının içine gömülür (hesap/sunucu yok, ~300 karakter); alıcı “Bu planı kullan” ile kendi planına alır
+  (mevcut planı sessizce ezmez). WhatsApp için saatli metin özeti de hazırlanır. Gelen bağlantı güvenilmez sayılır:
+  bilinmeyen mekân/slot atılır, boyut sınırlıdır. Bağlantı anlık görüntüdür; canlı ortak düzenleme sunucu gerektirir (yol haritasında).
 - **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
   yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
 
@@ -59,5 +62,5 @@ src/app/               Next.js App Router sayfaları
 
 ## Yol haritası
 
-Hesap + plan paylaşma/ortak plan · resmî tatil / özel gün saatleri · hava/mevsim bazlı öneri ·
+Hesap + canlı ortak plan düzenleme · resmî tatil / özel gün saatleri · hava/mevsim bazlı öneri ·
 kullanıcı oyları (“neden iyi” gerekçelerine) · gerçek yürüme/toplu taşıma süreleri · 81 ile genişleme · EN/DE.

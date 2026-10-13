@@ -13,7 +13,7 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
     <div className="space-y-5">
       <Link href={`/sehir/${slug}`} className="text-sm text-stone-500 hover:text-brand">← {city.name} rehberi</Link>
       <h1 className="text-3xl font-extrabold">{city.name} gezi planı</h1>
-      <Planner slug={slug} places={city.places} center={[city.lat, city.lng]} />
+      <Planner slug={slug} cityName={city.name} places={city.places} center={[city.lat, city.lng]} />
     </div>
   );
 }
