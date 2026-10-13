@@ -5,12 +5,12 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 
 ## Neler var (MVP)
 
-- **Şehir rehberleri** (İstanbul, İzmir, Antalya, Gaziantep): Yemek, Kültür & Tarih, Doğa & Manzara, Eğlence, Pub & Bar, Alışveriş.
+- **Şehir rehberleri** (İstanbul, İzmir, Antalya, Gaziantep, Kapadokya, Bodrum, Trabzon): Yemek, Kültür & Tarih, Doğa & Manzara, Eğlence, Pub & Bar, Alışveriş.
 - **Yemekte alt kategoriler + “şehrin en'leri”**: Kahvaltı, Kebap, Balık, Lokanta, Sokak lezzeti, Meyhane, Tatlı, Kahve… her tür için en iyi 3.
 - **“Neden iyi?”**: her mekânda somut gerekçeler, “mutlaka dene”, en iyi zaman, süre.
 - **Filtreler**: ortam (öğrenci dostu, romantik, gece hayatı, bütçe dostu…) ve bütçe.
 - **Gezi planlayıcı**: gün/tempo/ilgi/bütçeye göre otomatik plan (kahvaltı → gezi → öğle → … → gece; yakınlık + puan
-  optimizasyonu, yürüme/seyahat süreleri, yemek saatleri), sonra elle düzenleme. Plan tarayıcıda saklanır.
+  optimizasyonu, yürüme/seyahat süreleri, yemek saatleri), sonra elle düzenleme. Plan tarayıcıda saklanır. Gün batımı yerleri kendi dilimine (≥17:30) konur, gündoğumu deneyimleri (balon) otomatik plana girmez, tam gün aktiviteler (tekne turu, Ihlara) sabahı kaplar ve o günün öğle yemeğini atlar; plan 02:00'yi aşmaz.
 - **Harita görünümü**: şehir sayfasında Liste/Harita geçişi (filtreler haritaya da uygulanır, işaretçiden plana ekle); planda her günün rotası numaralı duraklar ve çizgiyle haritada. Leaflet + OpenStreetMap, API anahtarı gerekmez (yoğun trafikte kendi tile sağlayıcınıza geçin).
 - **“Şu an açık”**: kartlarda canlı durum (İstanbul saatiyle: açık/yakında kapanıyor/kapalı + açılış zamanı), listede “Şu an açık”
   filtresi, haritada kapalı mekânlar soluk. Planda gün seçince (ya da “Başlangıç günü”) kapalı mekânlar otomatik plana
@@ -25,6 +25,8 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
   farklı mekân eklerse ikisi de kalır. Sunucu her girdiyi doğrular (şekil, mekân kimliği, boyut sınırı, ad temizliği).
 - **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
   yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
+
+> **Mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — özellikle Google Places verisinin Google dışı haritada gösterilemeyeceği lisans kısıtı yayın öncesi çözülmelidir.
 
 ## Çalıştırma
 

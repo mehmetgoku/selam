@@ -14,54 +14,71 @@ export interface PlanPrefs {
   startDow?: number | null;
 }
 
-export type SlotId = "kahvalti" | "sabah" | "ogle" | "ikindi" | "kahve" | "aksam" | "gece";
+export type SlotId = "kahvalti" | "sabah" | "ogle" | "ikindi" | "kahve" | "gunbatimi" | "aksam" | "gece";
 
 interface Slot {
   id: SlotId;
   label: string;
   minStart: number; // dakika (günün başından)
+  /** bu saatten sonra başlayacaksa dilim atlanır (ör. 7 saatlik tekne turundan sonra "öğle yemeği" 17:30'a kalmasın) */
+  maxStart: number;
   match: (p: ScoredPlace, prefs: PlanPrefs) => boolean;
 }
 
+/** Bu süre ve üstü (tekne turu, Ihlara gibi) "tam gün" sayılır: yalnızca sabah diliminde başlayabilir. */
+const FULL_DAY_MIN = 240;
+/** Plan en geç 02:00'de biter (gece yarısından sonrası ertesi güne taşmasın). */
+const DAY_END = 26 * 60;
 const MAIN_MEAL: FoodType[] = ["kebap", "pide-lahmacun", "balik", "lokanta", "sokak"];
 const isFood = (p: ScoredPlace, types: FoodType[]) => p.cat === "yemek" && !!p.food && types.includes(p.food);
 const sights = (p: ScoredPlace) => p.cat === "kultur" || p.cat === "doga";
 
 export const SLOTS: Record<SlotId, Slot> = {
-  kahvalti: { id: "kahvalti", label: "Kahvaltı", minStart: 9 * 60, match: (p) => isFood(p, ["kahvalti"]) },
+  kahvalti: { id: "kahvalti", label: "Kahvaltı", minStart: 9 * 60, maxStart: 11 * 60, match: (p) => isFood(p, ["kahvalti"]) },
   sabah: {
     id: "sabah",
     label: "Sabah gezisi",
     minStart: 10 * 60 + 15,
-    match: (p, f) => sights(p) && f.interests.includes(p.cat),
+    maxStart: 12 * 60,
+    match: (p, f) => !p.when && (sights(p) || (p.cat === "eglence" && p.dur >= FULL_DAY_MIN)) && f.interests.includes(p.cat),
   },
-  ogle: { id: "ogle", label: "Öğle yemeği", minStart: 12 * 60 + 30, match: (p) => isFood(p, [...MAIN_MEAL]) },
+  ogle: { id: "ogle", label: "Öğle yemeği", minStart: 12 * 60 + 30, maxStart: 15 * 60, match: (p) => isFood(p, [...MAIN_MEAL]) },
   ikindi: {
     id: "ikindi",
     label: "İkindi",
     minStart: 14 * 60 + 30,
+    maxStart: 17 * 60 + 30,
     match: (p, f) =>
-      (sights(p) || p.cat === "eglence" || p.cat === "alisveris") && f.interests.includes(p.cat),
+      !p.when && (sights(p) || p.cat === "eglence" || p.cat === "alisveris") && f.interests.includes(p.cat),
   },
-  kahve: { id: "kahve", label: "Kahve / tatlı molası", minStart: 16 * 60 + 30, match: (p) => isFood(p, ["kahve", "tatli"]) },
+  gunbatimi: {
+    id: "gunbatimi",
+    label: "Gün batımı",
+    minStart: 17 * 60 + 30, // mevsime göre değişir; 17:30 kış sonu–yaz arası makul bir orta nokta
+    maxStart: 20 * 60,
+    match: (p, f) => p.when === "sunset" && f.interests.includes(p.cat),
+  },
+  kahve: { id: "kahve", label: "Kahve / tatlı molası", minStart: 16 * 60 + 30, maxStart: 18 * 60, match: (p) => isFood(p, ["kahve", "tatli"]) },
   aksam: {
     id: "aksam",
     label: "Akşam yemeği",
     minStart: 19 * 60,
+    maxStart: 21 * 60 + 30,
     match: (p) => isFood(p, ["balik", "meyhane", "kebap", "lokanta"]),
   },
   gece: {
     id: "gece",
     label: "Gece",
     minStart: 21 * 60 + 15,
-    match: (p, f) => (p.cat === "pub" && f.interests.includes("pub")) || (p.cat === "eglence" && p.vibes.includes("gece") && f.interests.includes("eglence")),
+    maxStart: 23 * 60 + 30,
+    match: (p, f) => (p.cat === "pub" && f.interests.includes("pub")) || (p.cat === "eglence" && !p.when && p.vibes.includes("gece") && f.interests.includes("eglence")),
   },
 };
 
 const TEMPLATES: Record<Pace, SlotId[]> = {
   rahat: ["kahvalti", "sabah", "ogle", "aksam"],
-  normal: ["kahvalti", "sabah", "ogle", "ikindi", "aksam", "gece"],
-  yogun: ["kahvalti", "sabah", "ogle", "ikindi", "kahve", "aksam", "gece"],
+  normal: ["kahvalti", "sabah", "ogle", "ikindi", "gunbatimi", "aksam", "gece"],
+  yogun: ["kahvalti", "sabah", "ogle", "ikindi", "kahve", "gunbatimi", "aksam", "gece"],
 };
 
 export interface TimedStop {
@@ -127,6 +144,7 @@ export function generatePlan(places: ScoredPlace[], prefs: PlanPrefs): Plan {
           const start = Math.max(cursor + travel, slot.minStart);
           return { p, start, v: p.score + vibeBoost(p) - 0.25 * toLast - 0.15 * toCenter };
         })
+        .filter((c) => c.start <= slot.maxStart && c.start + c.p.dur <= DAY_END && (c.p.dur < FULL_DAY_MIN || slotId === "sabah"))
         .filter((c) => {
           if (dow == null) return true;
           const st = checkVisit(c.p.hours, dow, c.start, c.start + c.p.dur).state;

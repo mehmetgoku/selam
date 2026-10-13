@@ -70,7 +70,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
           <button className={chip(cat === "hepsi")} onClick={() => { setCat("hepsi"); setFood(null); }}>
             ✨ Hepsi
           </button>
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.filter((c) => places.some((p) => p.cat === c.id)).map((c) => (
             <button key={c.id} className={chip(cat === c.id)} onClick={() => { setCat(c.id); setFood(null); }}>
               {c.emoji} {c.label}
             </button>

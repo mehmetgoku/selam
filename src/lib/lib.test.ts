@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadAllCities, loadCity } from "./data";
+import { haversineKm } from "./geo";
 import { generatePlan, scheduleDay, type PlanPrefs } from "./itinerary";
 import { rankPlaces, scorePlace } from "./rank";
 import type { Place } from "./types";
@@ -29,6 +30,9 @@ describe("rank", () => {
 });
 
 describe("seed veri", () => {
+  it("yedi şehir yüklü", () => {
+    expect(loadAllCities().map((c) => c.slug).sort()).toEqual(["antalya", "bodrum", "gaziantep", "istanbul", "izmir", "kapadokya", "trabzon"]);
+  });
   it("tüm şehirlerde id benzersiz, koordinatlar şehre yakın, gerekçe dolu", () => {
     for (const c of loadAllCities()) {
       const ids = new Set(c.places.map((p) => p.id));
@@ -38,6 +42,8 @@ describe("seed veri", () => {
         expect(p.cat === "yemek" ? !!p.food : !p.food).toBe(true);
         expect(p.ed).toBeGreaterThanOrEqual(0);
         expect(p.ed).toBeLessThanOrEqual(10);
+        // koordinat yazım hatası yakalayıcı: şehir merkezine en fazla 130 km (Efes, Ihlara, Uzungöl gibi gün gezileri dahil)
+        expect(haversineKm(c, p), `${p.id} şehir merkezinden çok uzak`).toBeLessThan(130);
       }
     }
   });
@@ -244,5 +250,54 @@ describe("ortak plan işlemleri", () => {
     expect(sanitizeName("x".repeat(100))).toHaveLength(24);
     expect(sanitizeName(42)).toBe("Misafir");
     expect(sanitizeName("   ")).toBe("Misafir");
+  });
+});
+
+describe("güneşe bağlı deneyimler", () => {
+  const prefs: PlanPrefs = { days: 3, pace: "yogun", interests: ["kultur", "doga", "eglence", "pub", "alisveris"], vibes: [], maxPrice: 4 };
+  it("gündoğumu (balon) otomatik plana girmez; gün batımı yeri 'Gün batımı' diliminde ve ≥17:30", () => {
+    const kap = loadCity("kapadokya")!;
+    const plan = generatePlan(kap.places, prefs);
+    const stops = plan.days.flatMap((d) => d.stops);
+    expect(stops.some((s) => s.placeId === "kap-balon")).toBe(false);
+    const sunset = stops.find((s) => s.placeId === "kap-kizilcukur");
+    expect(sunset?.slot).toBe("gunbatimi");
+    const byId = new Map(kap.places.map((p) => [p.id, p]));
+    for (const d of plan.days) {
+      const timed = scheduleDay(d.stops.map((s) => ({ place: byId.get(s.placeId)!, slot: s.slot })));
+      for (const t of timed) if (t.place.when === "sunset") expect(t.start).toBeGreaterThanOrEqual(17 * 60 + 30);
+    }
+  });
+  it("gün batımı yerleri öğle/ikindi dilimlerine düşmez", () => {
+    for (const c of loadAllCities()) {
+      const sunsetIds = new Set(c.places.filter((p) => p.when === "sunset").map((p) => p.id));
+      for (const d of generatePlan(c.places, prefs).days)
+        for (const s of d.stops) if (sunsetIds.has(s.placeId)) expect(s.slot).toBe("gunbatimi");
+    }
+  });
+});
+
+describe("gün sınırları (tüm şehirler, tüm tempolar)", () => {
+  const base: Omit<PlanPrefs, "pace"> = { days: 4, interests: ["kultur", "doga", "eglence", "pub", "alisveris"], vibes: [], maxPrice: 4 };
+  it("hiçbir gün gece yarısını aşmaz; tam gün aktiviteler yalnızca sabah diliminde", () => {
+    for (const c of loadAllCities()) {
+      const byId = new Map(c.places.map((p) => [p.id, p]));
+      for (const pace of ["rahat", "normal", "yogun"] as const) {
+        for (const d of generatePlan(c.places, { ...base, pace }).days) {
+          const timed = scheduleDay(d.stops.map((s) => ({ place: byId.get(s.placeId)!, slot: s.slot })));
+          for (const t of timed) {
+            expect(t.start, `${c.slug}/${pace}/${t.place.id}`).toBeLessThanOrEqual(23 * 60 + 30);
+            if (t.place.dur >= 240) expect(t.slot).toBe("Sabah gezisi");
+          }
+          if (timed.length) expect(timed[timed.length - 1].end, `${c.slug}/${pace}`).toBeLessThanOrEqual(26 * 60);
+        }
+      }
+    }
+  });
+  it("Bodrum'da tekne turu seçilirse o gün öğle yemeği atlanır (teknede)", () => {
+    const bod = loadCity("bodrum")!;
+    const plan = generatePlan(bod.places, { ...base, days: 3, pace: "normal" });
+    const day = plan.days.find((d) => d.stops.some((s) => s.placeId === "bod-tekne"));
+    if (day) expect(day.stops.map((s) => s.slot)).not.toContain("ogle");
   });
 });
