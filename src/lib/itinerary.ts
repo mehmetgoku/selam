@@ -1,4 +1,5 @@
 import { haversineKm, travelMinutes } from "./geo";
+import { checkVisit } from "./hours";
 import type { Category, FoodType, Plan, ScoredPlace, Vibe } from "./types";
 
 export type Pace = "rahat" | "normal" | "yogun";
@@ -9,6 +10,8 @@ export interface PlanPrefs {
   interests: Category[]; // yemek her zaman dahil
   vibes: Vibe[]; // seçilenlerden en az birini taşıyanlar öne çıkar
   maxPrice: 1 | 2 | 3 | 4;
+  /** ilk gezi günü (0 = Pazar); verilirse kapalı olan mekânlar plana alınmaz */
+  startDow?: number | null;
 }
 
 export type SlotId = "kahvalti" | "sabah" | "ogle" | "ikindi" | "kahve" | "aksam" | "gece";
@@ -108,8 +111,10 @@ export function generatePlan(places: ScoredPlace[], prefs: PlanPrefs): Plan {
       .filter((p) => !used.has(p.id) && sights(p) && prefs.interests.includes(p.cat))
       .sort((a, b) => b.score + vibeBoost(b) - (a.score + vibeBoost(a)))[0];
     const center = anchor ?? eligible.find((p) => !used.has(p.id));
+    const dow = prefs.startDow == null ? null : (prefs.startDow + d) % 7;
     const stops: { placeId: string; slot: SlotId }[] = [];
     let last = center;
+    let cursor = 9 * 60;
 
     for (const slotId of TEMPLATES[prefs.pace]) {
       const slot = SLOTS[slotId];
@@ -118,15 +123,23 @@ export function generatePlan(places: ScoredPlace[], prefs: PlanPrefs): Plan {
         .map((p) => {
           const toLast = last ? haversineKm(last, p) : 0;
           const toCenter = center ? haversineKm(center, p) : 0;
-          return { p, v: p.score + vibeBoost(p) - 0.25 * toLast - 0.15 * toCenter };
+          const travel = stops.length ? travelMinutes(toLast) : 0; // scheduleDay ile aynı: ilk durakta yol yok
+          const start = Math.max(cursor + travel, slot.minStart);
+          return { p, start, v: p.score + vibeBoost(p) - 0.25 * toLast - 0.15 * toCenter };
         })
-        .sort((a, b) => b.v - a.v)[0]?.p;
+        .filter((c) => {
+          if (dow == null) return true;
+          const st = checkVisit(c.p.hours, dow, c.start, c.start + c.p.dur).state;
+          return st !== "closed" && st !== "closing";
+        })
+        .sort((a, b) => b.v - a.v)[0];
       if (!pick) continue;
-      used.add(pick.id);
-      stops.push({ placeId: pick.id, slot: slotId });
-      last = pick;
+      cursor = pick.start + pick.p.dur;
+      used.add(pick.p.id);
+      stops.push({ placeId: pick.p.id, slot: slotId });
+      last = pick.p;
     }
-    days.push({ stops });
+    days.push({ stops, dow: dow ?? undefined });
   }
   return { days };
 }

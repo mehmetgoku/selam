@@ -7,7 +7,7 @@ const ROOT = process.cwd();
 const CITY_DIR = path.join(ROOT, "data", "cities");
 const SIGNAL_DIR = path.join(ROOT, "data", "signals");
 
-type Signals = Record<string, { google?: SourceSignal; tripadvisor?: SourceSignal; lat?: number; lng?: number }>;
+type Signals = Record<string, { hours?: Place["hours"]; google?: SourceSignal; tripadvisor?: SourceSignal; lat?: number; lng?: number }>;
 
 function readJson<T>(file: string): T | null {
   try {

@@ -84,3 +84,68 @@ describe("ingest eşleşmesi", () => {
     expect(ok?.signal.rating).toBe(4.5);
   });
 });
+
+import { checkVisit, istanbulNow, openStatus, statusText, type Period } from "./hours";
+import { parseGoogleHours } from "../../scripts/ingest";
+
+// Pzt-Cmt 09:00-17:00, Pazar kapalı; Cuma-Cmt barı 20:00 → ertesi 02:00
+const museum: Period[] = [1, 2, 3, 4, 5, 6].map((d) => ({ day: d, open: 540, close: 1020, closeDay: d }));
+const bar: Period[] = [5, 6].map((d) => ({ day: d, open: 1200, close: 120, closeDay: (d + 1) % 7 }));
+
+describe("hours", () => {
+  it("açık / kapalı / sonraki açılış", () => {
+    expect(openStatus(museum, { dow: 2, minute: 600 }).state).toBe("open");
+    const closed = openStatus(museum, { dow: 2, minute: 1100 });
+    expect(closed).toMatchObject({ state: "closed", opensAt: { dow: 3, minute: 540 } });
+    expect(openStatus(museum, { dow: 0, minute: 700 })).toMatchObject({ state: "closed", opensAt: { dow: 1, minute: 540 } });
+  });
+  it("gece yarısını aşan saatler ve hafta sonu sarması", () => {
+    expect(openStatus(bar, { dow: 6, minute: 60 }).state).toBe("open"); // Cuma gecesinin devamı: Cmt 01:00
+    expect(openStatus(bar, { dow: 0, minute: 60 }).state).toBe("open"); // Cmt gecesinin devamı: Paz 01:00
+    expect(openStatus(bar, { dow: 0, minute: 200 }).state).toBe("closed");
+    expect(openStatus(bar, { dow: 3, minute: 1300 })).toMatchObject({ state: "closed", opensAt: { dow: 5, minute: 1200 } });
+  });
+  it("bilinmeyen ve 7/24", () => {
+    expect(openStatus(undefined, { dow: 1, minute: 0 }).state).toBe("unknown");
+    expect(openStatus([], { dow: 1, minute: 0 }).state).toBe("unknown");
+    expect(openStatus("24/7", { dow: 1, minute: 0 }).state).toBe("always");
+  });
+  it("yakında kapanıyor metni", () => {
+    const now = { dow: 2, minute: 1000 };
+    expect(statusText(openStatus(museum, now), now)).toContain("Yakında kapanıyor");
+  });
+  it("ziyaret kontrolü: kapalı, kapanışa yetişmiyor, uygun", () => {
+    expect(checkVisit(museum, 0, 600, 660).state).toBe("closed"); // Pazar
+    expect(checkVisit(museum, 2, 1000, 1090).state).toBe("closing"); // 16:40 başla, 17:00 kapanır
+    expect(checkVisit(museum, 2, 600, 660).state).toBe("ok");
+    expect(checkVisit(undefined, 2, 600, 660).state).toBe("unknown");
+  });
+  it("İstanbul saati UTC+3", () => {
+    expect(istanbulNow(new Date("2026-10-13T21:30:00Z"))).toEqual({ dow: 3, minute: 30 }); // Çarşamba 00:30
+  });
+  it("Google periyotlarını dönüştürür", () => {
+    expect(parseGoogleHours([{ open: { day: 1, hour: 9 }, close: { day: 1, hour: 17, minute: 30 } }])).toEqual([
+      { day: 1, open: 540, close: 1050, closeDay: 1 },
+    ]);
+    expect(parseGoogleHours([{ open: { day: 0, hour: 0 } }])).toBe("24/7");
+    expect(parseGoogleHours(undefined)).toBeUndefined();
+  });
+});
+
+describe("saat farkındalıklı plan", () => {
+  const ist = loadCity("istanbul")!;
+  const prefs: PlanPrefs = { days: 1, pace: "normal", interests: ["kultur", "doga", "eglence", "pub", "alisveris"], vibes: [], maxPrice: 4 };
+  it("kapalı olduğu kesin mekânı seçmez, günü işaretler", () => {
+    // Topkapı'yı Pazartesi kapalı yap (gerçekte Salı kapalı; test için sentetik)
+    const topkapi = ist.places.find((p) => p.id === "ist-topkapi")!;
+    const places = ist.places.map((p) =>
+      p.id === "ist-topkapi" ? { ...p, hours: [2, 3, 4, 5, 6, 0].map((d) => ({ day: d, open: 540, close: 1020, closeDay: d })) } : p,
+    );
+    const mon = generatePlan(places, { ...prefs, startDow: 1 });
+    expect(mon.days[0].dow).toBe(1);
+    expect(mon.days[0].stops.some((s) => s.placeId === topkapi.id)).toBe(false);
+  });
+  it("startDow verilmezse davranış değişmez", () => {
+    expect(generatePlan(ist.places, prefs).days[0].dow).toBeUndefined();
+  });
+});

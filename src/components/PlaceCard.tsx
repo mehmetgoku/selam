@@ -1,5 +1,6 @@
 import { catEmoji, catLabel, foodLabel, PRICE_LABEL, vibeLabel } from "@/lib/categories";
 import { mapsUrl } from "@/lib/geo";
+import { openStatus, statusText, type Now } from "@/lib/hours";
 import type { ScoredPlace } from "@/lib/types";
 
 export function PlaceCard({
@@ -7,13 +8,17 @@ export function PlaceCard({
   rank,
   inPlan,
   onToggle,
+  now,
 }: {
   place: ScoredPlace;
   rank?: number;
   inPlan?: boolean;
   onToggle?: () => void;
+  now?: Now | null;
 }) {
   const { google, tripadvisor } = place;
+  const st = now ? openStatus(place.hours, now) : null;
+  const stText = st && now ? statusText(st, now) : null;
   return (
     <article className="rounded-2xl border border-stone-200 bg-white p-4 flex flex-col gap-3">
       <header className="flex items-start gap-3">
@@ -34,6 +39,20 @@ export function PlaceCard({
           <div className="text-[10px] uppercase tracking-wide text-stone-400">skor</div>
         </div>
       </header>
+
+      {st && stText && (
+        <p
+          className={`text-xs font-semibold rounded-full px-2.5 py-1 self-start ${
+            st.state === "closed"
+              ? "bg-red-50 text-red-700"
+              : st.state === "open" && st.minutesLeft <= 60
+                ? "bg-amber-50 text-amber-700"
+                : "bg-green-50 text-green-700"
+          }`}
+        >
+          {stText}
+        </p>
+      )}
 
       <div>
         <p className="text-xs font-semibold text-stone-500 mb-1">Neden iyi?</p>

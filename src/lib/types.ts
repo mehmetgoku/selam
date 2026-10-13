@@ -1,3 +1,5 @@
+import type { Hours } from "./hours";
+
 export type Category = "yemek" | "kultur" | "doga" | "eglence" | "pub" | "alisveris";
 
 export type FoodType =
@@ -49,6 +51,8 @@ export interface Place {
   dur: number;
   /** editoryal puan 0-10 (harici veri yokken ya da onu dengelemek için) */
   ed: number;
+  /** çalışma saatleri (ingest ile gelir; açık alanlar için "24/7") */
+  hours?: Hours;
   google?: SourceSignal;
   tripadvisor?: SourceSignal;
 }
@@ -78,6 +82,8 @@ export interface PlanStop {
 }
 export interface PlanDay {
   stops: PlanStop[];
+  /** gezi günü (0 = Pazar); seçilirse çalışma saatleri kontrol edilir */
+  dow?: number;
 }
 export interface Plan {
   days: PlanDay[];

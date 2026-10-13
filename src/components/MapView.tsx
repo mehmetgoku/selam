@@ -12,6 +12,8 @@ interface Props {
   /** verilirse noktalar bu sırayla numaralanır ve rota çizgisiyle birleştirilir */
   route?: ScoredPlace[];
   inPlan?: (id: string) => boolean;
+  /** true dönen mekânlar (ör. şu an kapalı) soluk çizilir */
+  dim?: (id: string) => boolean;
   onToggle?: (id: string) => void;
   height?: string;
 }
@@ -49,7 +51,7 @@ function popup(p: ScoredPlace, inPlan: boolean | undefined, onToggle?: () => voi
   return el;
 }
 
-export default function MapView({ places, center, route, inPlan, onToggle, height = "70vh" }: Props) {
+export default function MapView({ places, center, route, inPlan, dim, onToggle, height = "70vh" }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -85,7 +87,7 @@ export default function MapView({ places, center, route, inPlan, onToggle, heigh
         className: "",
         iconSize: [30, 30],
         iconAnchor: [15, 15],
-        html: `<div style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:${n ? 13 : 15}px;font-weight:700;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px #0006;background:${
+        html: `<div style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:${n ? 13 : 15}px;font-weight:700;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px #0006;opacity:${dim?.(p.id) ? 0.4 : 1};background:${
           n || planned ? "#c2410c" : "#1c1917"
         }">${n ?? catEmoji(p.cat)}</div>`,
       });
@@ -99,7 +101,7 @@ export default function MapView({ places, center, route, inPlan, onToggle, heigh
       fitted.current = key;
       m.fitBounds(L.latLngBounds(pts).pad(0.2), { maxZoom: 15 });
     }
-  }, [places, route, inPlan, onToggle]);
+  }, [places, route, inPlan, dim, onToggle]);
 
   return <div ref={host} style={{ height }} className="rounded-2xl border border-stone-200 z-0" />;
 }

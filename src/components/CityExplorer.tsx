@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CATEGORIES, FOOD_TYPES, PRICE_LABEL, VIBES } from "@/lib/categories";
+import { openStatus } from "@/lib/hours";
+import { useNow } from "@/lib/useNow";
 import { usePlan } from "@/lib/usePlan";
 import type { Category, FoodType, ScoredPlace, Vibe } from "@/lib/types";
 import { MapView } from "./MapLoader";
@@ -18,7 +20,17 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
   const [food, setFood] = useState<FoodType | null>(null);
   const [vibe, setVibe] = useState<Vibe | null>(null);
   const [maxPrice, setMaxPrice] = useState<1 | 2 | 3 | 4>(4);
+  const [openOnly, setOpenOnly] = useState(false);
+  const now = useNow();
   const { has, add, remove, count } = usePlan(slug);
+
+  const isClosed = useCallback(
+    (id: string) => {
+      const p = places.find((x) => x.id === id);
+      return !!now && !!p && openStatus(p.hours, now).state === "closed";
+    },
+    [places, now],
+  );
 
   const filtered = useMemo(
     () =>
@@ -27,13 +39,14 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
           (cat === "hepsi" || p.cat === cat) &&
           (!food || p.food === food) &&
           (!vibe || p.vibes.includes(vibe)) &&
-          p.price <= maxPrice,
+          p.price <= maxPrice &&
+          (!openOnly || !now || openStatus(p.hours, now).state !== "closed"),
       ),
-    [places, cat, food, vibe, maxPrice],
+    [places, cat, food, vibe, maxPrice, openOnly, now],
   );
 
   const card = (p: ScoredPlace, rank?: number) => (
-    <PlaceCard key={p.id} place={p} rank={rank} inPlan={has(p.id)} onToggle={() => (has(p.id) ? remove(p.id) : add(p.id))} />
+    <PlaceCard key={p.id} place={p} now={now} rank={rank} inPlan={has(p.id)} onToggle={() => (has(p.id) ? remove(p.id) : add(p.id))} />
   );
 
   // Gruplu görünümler: "Hepsi" → kategori başına en iyi 3; "Yemek" → tür başına en iyi 3
@@ -95,6 +108,14 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
               <option key={n} value={n}>{n === 4 ? "Her bütçe" : `En fazla ${PRICE_LABEL[n]}`}</option>
             ))}
           </select>
+          <button
+            aria-pressed={openOnly}
+            onClick={() => setOpenOnly(!openOnly)}
+            className={chip(openOnly)}
+            title="Kapalı olduğu kesin olan mekânları gizler; saati bilinmeyenler listede kalır"
+          >
+            🟢 Şu an açık
+          </button>
           <div className="flex rounded-full border border-stone-300 bg-white overflow-hidden" role="group" aria-label="Görünüm">
             {(["liste", "harita"] as const).map((v) => (
               <button
@@ -116,6 +137,18 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
         </div>
       </div>
 
+      {openOnly && now && (
+        <p className="text-xs text-stone-500">
+          İstanbul saatiyle {String(Math.floor(now.minute / 60)).padStart(2, "0")}:{String(now.minute % 60).padStart(2, "0")}.{" "}
+          {(() => {
+            const unknown = filtered.filter((p) => openStatus(p.hours, now).state === "unknown").length;
+            return unknown
+              ? `${unknown} mekânın çalışma saati henüz bilinmiyor, bu yüzden listede kaldı (saatler Google'dan "npm run ingest" ile gelir).`
+              : "Listedeki tüm mekânların saati biliniyor.";
+          })()}
+        </p>
+      )}
+
       {filtered.length === 0 && (
         <p className="text-stone-500 py-10 text-center">Bu filtrelerle mekân yok — filtreleri gevşet.</p>
       )}
@@ -125,6 +158,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
           places={filtered}
           center={center}
           inPlan={has}
+          dim={isClosed}
           onToggle={(id) => (has(id) ? remove(id) : add(id))}
         />
       ) : sections

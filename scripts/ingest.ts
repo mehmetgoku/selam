@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { haversineKm } from "../src/lib/geo";
+import type { Hours, Period } from "../src/lib/hours";
 import type { City, Place, SourceSignal } from "../src/lib/types";
 
 const ROOT = path.join(import.meta.dirname, "..");
@@ -17,7 +18,24 @@ const MAX_KM = 1.5;
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const TA_KEY = process.env.TRIPADVISOR_API_KEY;
 
-type Out = Record<string, { google?: SourceSignal; tripadvisor?: SourceSignal; lat?: number; lng?: number }>;
+type Out = Record<string, { google?: SourceSignal; tripadvisor?: SourceSignal; lat?: number; lng?: number; hours?: Hours }>;
+
+/** Google `regularOpeningHours.periods` → sade Hours. Kapanışsız tek dönem = 7/24. */
+export function parseGoogleHours(periods?: { open?: { day: number; hour: number; minute?: number }; close?: { day: number; hour: number; minute?: number } }[]): Hours | undefined {
+  if (!periods?.length) return undefined;
+  if (periods.length === 1 && periods[0].open && !periods[0].close) return "24/7";
+  const out: Period[] = [];
+  for (const p of periods) {
+    if (!p.open || !p.close) continue;
+    out.push({
+      day: p.open.day,
+      open: p.open.hour * 60 + (p.open.minute ?? 0),
+      close: p.close.hour * 60 + (p.close.minute ?? 0),
+      closeDay: p.close.day,
+    });
+  }
+  return out.length ? out : undefined;
+}
 
 export async function googleLookup(p: Place, cityName: string, fetchFn = fetch) {
   const res = await fetchFn("https://places.googleapis.com/v1/places:searchText", {
@@ -25,7 +43,7 @@ export async function googleLookup(p: Place, cityName: string, fetchFn = fetch) 
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_KEY!,
-      "X-Goog-FieldMask": "places.id,places.displayName,places.rating,places.userRatingCount,places.location,places.googleMapsUri",
+      "X-Goog-FieldMask": "places.id,places.displayName,places.rating,places.userRatingCount,places.location,places.googleMapsUri,places.regularOpeningHours.periods",
     },
     body: JSON.stringify({
       textQuery: `${p.name} ${p.district} ${cityName}`,
@@ -51,6 +69,7 @@ export async function googleLookup(p: Place, cityName: string, fetchFn = fetch) 
     } satisfies SourceSignal,
     lat: hit.location.latitude as number,
     lng: hit.location.longitude as number,
+    hours: parseGoogleHours(hit.regularOpeningHours?.periods),
   };
 }
 
@@ -104,7 +123,10 @@ async function main() {
       try {
         if (GOOGLE_KEY) {
           const g = await googleLookup(place, city.name);
-          if (g) Object.assign(entry, { google: g.signal, lat: g.lat, lng: g.lng });
+          if (g) {
+            Object.assign(entry, { google: g.signal, lat: g.lat, lng: g.lng });
+            if (g.hours) entry.hours = g.hours; // seed'deki "24/7" varsayımı Google yanıtıyla ezilir
+          }
         }
         if (TA_KEY) {
           const t = await tripadvisorLookup(place, city.name);

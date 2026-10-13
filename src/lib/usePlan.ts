@@ -47,10 +47,10 @@ export function usePlan(city: string) {
     setPlan((p) =>
       p.days.some((d) => d.stops.some((s) => s.placeId === id))
         ? p
-        : { days: p.days.map((d, i) => (i === day ? { stops: [...d.stops, { placeId: id }] } : d)) },
+        : { days: p.days.map((d, i) => (i === day ? { ...d, stops: [...d.stops, { placeId: id }] } : d)) },
     );
   const remove = (id: string) =>
-    setPlan((p) => ({ days: p.days.map((d) => ({ stops: d.stops.filter((s) => s.placeId !== id) })) }));
+    setPlan((p) => ({ days: p.days.map((d) => ({ ...d, stops: d.stops.filter((s) => s.placeId !== id) })) }));
   const count = plan.days.reduce((n, d) => n + d.stops.length, 0);
 
   return { plan, setPlan, ready, has, add, remove, count };

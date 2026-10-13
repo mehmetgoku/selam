@@ -12,6 +12,10 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 - **Gezi planlayıcı**: gün/tempo/ilgi/bütçeye göre otomatik plan (kahvaltı → gezi → öğle → … → gece; yakınlık + puan
   optimizasyonu, yürüme/seyahat süreleri, yemek saatleri), sonra elle düzenleme. Plan tarayıcıda saklanır.
 - **Harita görünümü**: şehir sayfasında Liste/Harita geçişi (filtreler haritaya da uygulanır, işaretçiden plana ekle); planda her günün rotası numaralı duraklar ve çizgiyle haritada. Leaflet + OpenStreetMap, API anahtarı gerekmez (yoğun trafikte kendi tile sağlayıcınıza geçin).
+- **“Şu an açık”**: kartlarda canlı durum (İstanbul saatiyle: açık/yakında kapanıyor/kapalı + açılış zamanı), listede “Şu an açık”
+  filtresi, haritada kapalı mekânlar soluk. Planda gün seçince (ya da “Başlangıç günü”) kapalı mekânlar otomatik plana
+  alınmaz, elle eklenenlerde ⚠ uyarısı çıkar. Saatler Google Places'ten `npm run ingest` ile gelir; **saati bilinmeyen
+  mekân “bilinmiyor” sayılır, tahmin edilmez** (yalnız sahil/köprü/cadde gibi açık alanlar seed'de `"hours": "24/7"`).
 - **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
   yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
 
@@ -55,5 +59,5 @@ src/app/               Next.js App Router sayfaları
 
 ## Yol haritası
 
-Hesap + plan paylaşma/ortak plan · “şu an açık” (çalışma saatleri) · hava/mevsim bazlı öneri ·
+Hesap + plan paylaşma/ortak plan · resmî tatil / özel gün saatleri · hava/mevsim bazlı öneri ·
 kullanıcı oyları (“neden iyi” gerekçelerine) · gerçek yürüme/toplu taşıma süreleri · 81 ile genişleme · EN/DE.
