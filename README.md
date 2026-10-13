@@ -19,6 +19,10 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 - **Plan paylaşma**: plan bağlantının içine gömülür (hesap/sunucu yok, ~300 karakter); alıcı “Bu planı kullan” ile kendi planına alır
   (mevcut planı sessizce ezmez). WhatsApp için saatli metin özeti de hazırlanır. Gelen bağlantı güvenilmez sayılır:
   bilinmeyen mekân/slot atılır, boyut sınırlıdır. Bağlantı anlık görüntüdür; canlı ortak düzenleme sunucu gerektirir (yol haritasında).
+- **Arkadaşlarla ortak planlama**: “Ortak oda aç” ile plan bir odaya taşınır; davet bağlantısını açan herkes (hesapsız, sadece ad girerek)
+  aynı planı **canlı** düzenler (2 sn'de bir senkron), mekânlara 👍 oy verir, kimlerin odada olduğunu ve son hareketleri görür.
+  Değişiklikler tüm planı değil küçük **işlemler** (ekle/çıkar/taşı/oy…) olarak sunucuda sırayla uygulanır; iki kişi aynı anda
+  farklı mekân eklerse ikisi de kalır. Sunucu her girdiyi doğrular (şekil, mekân kimliği, boyut sınırı, ad temizliği).
 - **Selam skoru**: Bayes düzeltmeli Google + TripAdvisor puanları ile editoryal puanın harmanı (az yorumlu “5.0”
   yerler şişmez). İki kaynak varsa “yerel mi turist mi” göstergesi (`localness`) hesaplanır.
 
@@ -30,6 +34,14 @@ npm run dev        # http://localhost:3000
 npm test           # sıralama, plan, ingest eşleşme testleri
 npm run build
 ```
+
+## Ortak oda sunucusu
+
+Odalar `data/selam.db` (SQLite, Node'un yerleşik `node:sqlite`'ı — deneysel uyarı verir) dosyasında tutulur; yol `SELAM_DB` ile değişir.
+Bu, **tek sunuculu/kalıcı diskli** kurulum (VM, Fly.io, Railway…) içindir. Vercel gibi sunucusuz/salt-okunur diskli ortamlarda
+çalışmaz: `src/server/rooms.ts` içindeki depoyu paylaşımlı bir veritabanıyla (Postgres/Redis) değiştirin; mantık (`src/lib/collab.ts`) aynı kalır.
+Güvenlik modeli “bağlantı = yetki”dir (oda kimliği 72 bit rastgele); oda 120 gün hareketsiz kalınca silinir, saatte en fazla 500 oda açılır.
+Hesap/kimlik doğrulama yoktur — kötüye kullanım gerekirse IP bazlı hız sınırı ve oda sahibi/salt-okunur bağlantı eklenmelidir.
 
 ## Veri: Google Maps & TripAdvisor
 
@@ -62,5 +74,5 @@ src/app/               Next.js App Router sayfaları
 
 ## Yol haritası
 
-Hesap + canlı ortak plan düzenleme · resmî tatil / özel gün saatleri · hava/mevsim bazlı öneri ·
+Hesaplar · oda sahibi/salt-okunur bağlantı · ortak aday havuzu (öner → oyla → plana al) · SSE ile anlık senkron · resmî tatil / özel gün saatleri · hava/mevsim bazlı öneri ·
 kullanıcı oyları (“neden iyi” gerekçelerine) · gerçek yürüme/toplu taşıma süreleri · 81 ile genişleme · EN/DE.

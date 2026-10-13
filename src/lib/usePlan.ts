@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { applyOp, type Op, type OpCtx } from "./collab";
 import type { Plan } from "./types";
 
 const key = (city: string) => `selam:plan:${city}`;
@@ -51,7 +52,13 @@ export function usePlan(city: string) {
     );
   const remove = (id: string) =>
     setPlan((p) => ({ days: p.days.map((d) => ({ ...d, stops: d.stops.filter((s) => s.placeId !== id) })) }));
+  /** Ortak oda ile aynı işlem kümesi; yerelde sunucu yok, doğrudan uygulanır. */
+  const dispatch = (op: Op, ctx: Pick<OpCtx, "validIds" | "nameOf">) =>
+    setPlan((p) => {
+      const r = applyOp({ plan: p, votes: {} }, op, { ...ctx, cid: "local", name: "ben" });
+      return r.ok ? r.state.plan : p;
+    });
   const count = plan.days.reduce((n, d) => n + d.stops.length, 0);
 
-  return { plan, setPlan, ready, has, add, remove, count };
+  return { plan, setPlan, ready, has, add, remove, dispatch, count };
 }

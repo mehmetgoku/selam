@@ -1,20 +1,32 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CATEGORIES, PRICE_LABEL } from "@/lib/categories";
 import { haversineKm, mapsUrl } from "@/lib/geo";
 import { checkVisit, DAY_NAMES } from "@/lib/hours";
 import { fmtTime, generatePlan, scheduleDay, type Pace, type PlanPrefs } from "@/lib/itinerary";
 import { MapView } from "./MapLoader";
+import type { Op } from "@/lib/collab";
 import { decodePlan, encodePlan, shareText } from "@/lib/sharePlan";
 import { usePlan } from "@/lib/usePlan";
+import { useRoom } from "@/lib/useRoom";
 import type { Category, Plan, ScoredPlace } from "@/lib/types";
 
 export function Planner({ slug, cityName, places, center }: { slug: string; cityName: string; places: ScoredPlace[]; center: [number, number] }) {
   const [shared, setShared] = useState<Plan | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<number | null>(null);
-  const { plan, setPlan, ready } = usePlan(slug);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const local = usePlan(slug);
+  const room = useRoom(roomId, places);
+  const plan = roomId ? room.state.plan : local.plan;
+  const ready = roomId ? room.status !== "idle" && room.status !== "loading" : local.ready;
   const byId = new Map(places.map((p) => [p.id, p]));
+  const localCtx = useMemo(() => ({ validIds: new Set(places.map((p) => p.id)), nameOf: (id: string) => byId.get(id)?.name ?? id }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [places]);
+  /** Yerel plan ya da ortak oda: ikisi de aynı işlem kümesiyle düzenlenir. */
+  const dispatch = (op: Op) => (roomId ? room.dispatch(op) : local.dispatch(op, localCtx));
   const [prefs, setPrefs] = useState<PlanPrefs>({
     days: 2,
     pace: "normal",
@@ -26,7 +38,10 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
   const [adding, setAdding] = useState<number | null>(null);
 
   useEffect(() => {
-    const raw = new URLSearchParams(window.location.search).get("p");
+    const q = new URLSearchParams(window.location.search);
+    const oda = q.get("oda");
+    if (oda && /^[A-Za-z0-9_-]{12}$/.test(oda)) setRoomId(oda);
+    const raw = q.get("p");
     if (raw) setShared(decodePlan(raw, new Set(places.map((p) => p.id))));
   }, [places]);
 
@@ -66,10 +81,10 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
   const adoptShared = () => {
     if (!shared) return;
     const hasOwn = plan.days.some((d) => d.stops.length);
-    if (hasOwn && !window.confirm("Mevcut planın silinip paylaşılan planla değiştirilecek. Devam edilsin mi?")) return;
-    setPlan(() => shared);
+    if (hasOwn && !window.confirm(roomId ? "Ortak plan, paylaşılan planla DEĞİŞTİRİLECEK (herkes görür). Devam edilsin mi?" : "Mevcut planın silinip paylaşılan planla değiştirilecek. Devam edilsin mi?")) return;
+    dispatch({ t: "replace", plan: shared });
     setShared(null);
-    window.history.replaceState(null, "", window.location.pathname);
+    window.history.replaceState(null, "", window.location.pathname + (roomId ? `?oda=${roomId}` : ""));
   };
 
   const toggleInterest = (c: Category) =>
@@ -79,37 +94,127 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
     }));
 
   const auto = () => {
-    const next = generatePlan(places, prefs);
-    setPlan(() => next);
+    if (roomId && plan.days.some((d) => d.stops.length) && !window.confirm("Ortak plan baştan oluşturulacak ve herkesin planı değişecek. Devam edilsin mi?")) return;
+    dispatch({ t: "replace", plan: generatePlan(places, prefs) });
   };
 
-  const move = (d: number, i: number, dir: -1 | 1) =>
-    setPlan((p) => ({
-      days: p.days.map((day, di) => {
-        if (di !== d) return day;
-        const stops = [...day.stops];
-        const j = i + dir;
-        if (j < 0 || j >= stops.length) return day;
-        [stops[i], stops[j]] = [stops[j], stops[i]];
-        return { ...day, stops };
-      }),
-    }));
-  const removeAt = (d: number, i: number) =>
-    setPlan((p) => ({ days: p.days.map((day, di) => (di === d ? { ...day, stops: day.stops.filter((_, k) => k !== i) } : day)) }));
-  const addTo = (d: number, id: string) =>
-    setPlan((p) =>
-      p.days.some((day) => day.stops.some((s) => s.placeId === id))
-        ? p
-        : { days: p.days.map((day, di) => (di === d ? { ...day, stops: [...day.stops, { placeId: id }] } : day)) },
-    );
-  const setDow = (d: number, dow: number | undefined) =>
-    setPlan((p) => ({ days: p.days.map((day, di) => (di === d ? { ...day, dow } : day)) }));
-  const addDay = () => setPlan((p) => ({ days: [...p.days, { stops: [] }] }));
+  const move = (id: string, dir: -1 | 1) => dispatch({ t: "move", placeId: id, dir });
+  const removeStop = (id: string) => dispatch({ t: "remove", placeId: id });
+  const addTo = (d: number, id: string) => dispatch({ t: "add", placeId: id, day: d });
+  const setDow = (d: number, dow: number | undefined) => dispatch({ t: "dow", day: d, dow });
+  const addDay = () => dispatch({ t: "addDay" });
+
+  const startRoom = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city: slug, plan: local.plan.days.some((d) => d.stops.length) ? local.plan : undefined }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      window.history.pushState(null, "", `${window.location.pathname}?oda=${body.id}`);
+      setRoomId(body.id);
+    } catch (e) {
+      flash(`Oda açılamadı: ${(e as Error).message || "bağlantı hatası"}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?oda=${roomId}`);
+      flash("Davet bağlantısı kopyalandı");
+    } catch {
+      flash("Kopyalanamadı — adres çubuğundaki bağlantıyı gönder");
+    }
+  };
 
   const planned = new Set(plan.days.flatMap((d) => d.stops.map((s) => s.placeId)));
 
   return (
     <div className="space-y-6">
+      {!roomId && (
+        <section className="rounded-2xl bg-white border border-stone-200 p-4 flex flex-wrap items-center gap-3">
+          <div className="mr-auto">
+            <h2 className="font-bold">👥 Arkadaşlarla birlikte planla</h2>
+            <p className="text-xs text-stone-500">Ortak bir oda aç: herkes aynı planı canlı düzenler, mekânlara oy verir.</p>
+          </div>
+          <button
+            onClick={startRoom}
+            disabled={creating}
+            className="rounded-full bg-ink text-white px-4 py-1.5 text-sm font-semibold disabled:opacity-50"
+          >
+            {creating ? "Açılıyor…" : "Ortak oda aç"}
+          </button>
+        </section>
+      )}
+      {roomId && (
+        <section className="rounded-2xl bg-brand-soft border border-brand/30 p-4 space-y-3">
+          {room.status === "notfound" ? (
+            <p className="font-semibold">Bu oda bulunamadı ya da süresi dolmuş. Bağlantıyı kontrol et.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="font-bold mr-auto">
+                  👥 Ortak plan{" "}
+                  <span className={`text-xs font-semibold ${room.status === "live" ? "text-green-700" : "text-red-700"}`}>
+                    {room.status === "live" ? "● canlı" : room.status === "offline" ? "● bağlantı yok" : "● bağlanıyor"}
+                  </span>
+                </h2>
+                <div className="flex -space-x-2" aria-label="Odadakiler">
+                  {room.participants.map((p) => (
+                    <span
+                      key={p.cid}
+                      title={p.cid === room.me.cid ? `${p.name} (sen)` : p.name}
+                      className="w-8 h-8 rounded-full border-2 border-white grid place-items-center text-xs font-bold text-white"
+                      style={{ background: `hsl(${[...p.cid].reduce((h, c) => h + c.charCodeAt(0) * 7, 0) % 360} 55% 40%)` }}
+                    >
+                      {p.name.slice(0, 1).toLocaleUpperCase("tr")}
+                    </span>
+                  ))}
+                </div>
+                <button onClick={copyInvite} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
+                  Davet bağlantısını kopyala
+                </button>
+              </div>
+              {room.me.cid && !room.me.name ? (
+                <form
+                  className="flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const v = new FormData(e.currentTarget).get("ad");
+                    if (typeof v === "string" && v.trim()) room.setName(v);
+                  }}
+                >
+                  <input
+                    name="ad"
+                    maxLength={24}
+                    placeholder="Adın (arkadaşların görecek)"
+                    className="flex-1 rounded-lg border border-stone-300 px-3 py-1.5 text-sm"
+                    autoFocus
+                  />
+                  <button className="rounded-full bg-ink text-white px-4 py-1.5 text-sm font-semibold">Katıl</button>
+                </form>
+              ) : (
+                <p className="text-xs text-stone-600">
+                  Sen: <strong>{room.me.name || "…"}</strong> ·{" "}
+                  <button className="underline" onClick={() => { const n = window.prompt("Yeni adın", room.me.name); if (n?.trim()) room.setName(n); }}>
+                    değiştir
+                  </button>
+                  . Bağlantıya sahip herkes planı düzenleyebilir — bağlantıyı yalnızca güvendiğin kişilerle paylaş.
+                </p>
+              )}
+              {room.error && (
+                <p role="alert" className="text-sm text-red-700 bg-red-50 rounded px-3 py-1.5">
+                  {room.error} <button className="underline" onClick={room.clearError}>kapat</button>
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
       {shared && (
         <section className="rounded-2xl bg-brand-soft border border-brand/30 p-4 space-y-2">
           <h2 className="font-bold">🔗 Sana bir plan paylaşıldı</h2>
@@ -257,15 +362,29 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
                       ) : null;
                     })()}
                     <p className="text-sm text-stone-600">{s.place.why[0]}</p>
+                    {roomId && (() => {
+                      const v = room.state.votes[s.place.id] ?? {};
+                      const mine = room.me.cid in v;
+                      return (
+                        <button
+                          onClick={() => dispatch({ t: "vote", placeId: s.place.id })}
+                          title={Object.values(v).join(", ") || "İlk oyu sen ver"}
+                          aria-pressed={mine}
+                          className={`mt-1 mr-2 rounded-full border px-2 py-0.5 text-xs ${mine ? "bg-brand text-white border-brand" : "bg-white border-stone-300"}`}
+                        >
+                          👍 {Object.keys(v).length || ""} {Object.keys(v).length > 0 && <span className="opacity-80">{Object.values(v).slice(0, 2).join(", ")}{Object.keys(v).length > 2 ? "…" : ""}</span>}
+                        </button>
+                      );
+                    })()}
                     <p className="text-xs text-stone-500 mt-1">
                       ~{s.place.dur} dk · {s.place.district} ·{" "}
                       <a className="underline" href={mapsUrl(s.place)} target="_blank" rel="noopener noreferrer">Harita</a>
                     </p>
                   </div>
                   <div className="flex flex-col gap-1 text-xs">
-                    <button aria-label="Yukarı" onClick={() => move(d, i, -1)} disabled={i === 0} className="disabled:opacity-30">▲</button>
-                    <button aria-label="Aşağı" onClick={() => move(d, i, 1)} disabled={i === timed.length - 1} className="disabled:opacity-30">▼</button>
-                    <button aria-label="Kaldır" onClick={() => removeAt(d, i)}>✕</button>
+                    <button aria-label="Yukarı" onClick={() => move(s.place.id, -1)} disabled={i === 0} className="disabled:opacity-30">▲</button>
+                    <button aria-label="Aşağı" onClick={() => move(s.place.id, 1)} disabled={i === timed.length - 1} className="disabled:opacity-30">▼</button>
+                    <button aria-label="Kaldır" onClick={() => removeStop(s.place.id)}>✕</button>
                   </div>
                 </li>
               ))}
@@ -308,6 +427,18 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
           <p className="basis-full text-xs text-stone-500">
             Bağlantı planın o anki halini içerir (sunucuda saklanmaz); sonradan yaptığın değişiklikler için yeniden paylaş.
           </p>
+        </section>
+      )}
+      {roomId && room.log.length > 0 && (
+        <section className="rounded-2xl bg-white border border-stone-200 p-4">
+          <h2 className="font-bold mb-2">Son hareketler</h2>
+          <ul className="space-y-1 text-sm text-stone-700">
+            {[...room.log].reverse().slice(0, 8).map((l) => (
+              <li key={l.t + l.text}>
+                <strong>{l.by}</strong> · {l.text}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
       {toast && (

@@ -171,3 +171,78 @@ describe("plan paylaşımı", () => {
     expect(decodePlan(Array(20).fill("-.ist-van").join("~"), ids)).toBeNull();
   });
 });
+
+import { applyOp, emptyState, parseOp, sanitizeName, sanitizePlan, type OpCtx, type RoomState } from "./collab";
+
+describe("ortak plan işlemleri", () => {
+  const ist = loadCity("istanbul")!;
+  const valid = new Set(ist.places.map((p) => p.id));
+  const ctx = (cid: string): OpCtx => ({ cid, name: cid, validIds: valid, nameOf: (id) => id });
+  const run = (s: RoomState, op: Parameters<typeof applyOp>[1], cid = "a") => {
+    const r = applyOp(s, op, ctx(cid));
+    if (!r.ok) throw new Error(r.error);
+    return r;
+  };
+
+  it("eşzamanlı eklemeler birbirini ezmez (sunucu sırayla uygular)", () => {
+    let s = emptyState();
+    s = run(s, { t: "add", placeId: "ist-van", day: 0 }, "ayse").state;
+    s = run(s, { t: "add", placeId: "ist-moda", day: 0 }, "can").state;
+    expect(s.plan.days[0].stops.map((x) => x.placeId)).toEqual(["ist-van", "ist-moda"]);
+  });
+  it("iki kişi aynı mekânı eklerse tek kez eklenir; çifte silme zararsız", () => {
+    let s = run(emptyState(), { t: "add", placeId: "ist-van", day: 0 }).state;
+    const dup = run(s, { t: "add", placeId: "ist-van", day: 0 }, "b");
+    expect(dup.summary).toBe("");
+    expect(dup.state.plan.days[0].stops).toHaveLength(1);
+    s = run(s, { t: "remove", placeId: "ist-van" }).state;
+    expect(run(s, { t: "remove", placeId: "ist-van" }, "b").summary).toBe("");
+  });
+  it("taşıma mekâna bağlı: araya başkası girse bile aynı mekân kayar", () => {
+    let s = emptyState();
+    for (const id of ["ist-van", "ist-moda", "ist-galata"]) s = run(s, { t: "add", placeId: id, day: 0 }).state;
+    s = run(s, { t: "move", placeId: "ist-galata", dir: -1 }).state;
+    expect(s.plan.days[0].stops.map((x) => x.placeId)).toEqual(["ist-van", "ist-galata", "ist-moda"]);
+    expect(run(s, { t: "move", placeId: "ist-van", dir: -1 }).summary).toBe(""); // kenarda etkisiz
+  });
+  it("oy: aç/kapa, çıkarılan mekânın oyları silinir, planda olmayana oy reddedilir", () => {
+    let s = run(emptyState(), { t: "add", placeId: "ist-van", day: 0 }).state;
+    s = run(s, { t: "vote", placeId: "ist-van" }, "ayse").state;
+    s = run(s, { t: "vote", placeId: "ist-van" }, "can").state;
+    expect(Object.keys(s.votes["ist-van"])).toEqual(["ayse", "can"]);
+    s = run(s, { t: "vote", placeId: "ist-van" }, "ayse").state;
+    expect(Object.keys(s.votes["ist-van"])).toEqual(["can"]);
+    expect(applyOp(s, { t: "vote", placeId: "ist-moda" }, ctx("a")).ok).toBe(false);
+    expect(run(s, { t: "remove", placeId: "ist-van" }).state.votes).toEqual({});
+  });
+  it("gün işlemleri ve sınırlar", () => {
+    let s = run(emptyState(), { t: "dow", day: 0, dow: 3 }).state;
+    expect(s.plan.days[0].dow).toBe(3);
+    s = run(s, { t: "dow", day: 0 }).state;
+    expect("dow" in s.plan.days[0]).toBe(false);
+    expect(applyOp(s, { t: "dow", day: 5, dow: 1 }, ctx("a")).ok).toBe(false);
+    for (let i = 1; i < 14; i++) s = run(s, { t: "addDay" }).state;
+    expect(applyOp(s, { t: "addDay" }, ctx("a")).ok).toBe(false);
+  });
+  it("applyOp state'i değiştirmez (saf)", () => {
+    const s = emptyState();
+    const snap = JSON.stringify(s);
+    run(s, { t: "add", placeId: "ist-van", day: 0 });
+    expect(JSON.stringify(s)).toBe(snap);
+  });
+  it("parseOp/sanitizePlan/sanitizeName güvenilmeyen girdiyi reddeder/temizler", () => {
+    expect(parseOp({ t: "add", placeId: "yok", day: 0 }, valid)).toBeNull();
+    expect(parseOp({ t: "add", placeId: "ist-van", day: "0" }, valid)).toBeNull();
+    expect(parseOp({ t: "move", placeId: "ist-van", dir: 2 }, valid)).toBeNull();
+    expect(parseOp({ t: "dow", day: 0, dow: 9 }, valid)).toBeNull();
+    expect(parseOp({ t: "bilinmeyen" }, valid)).toBeNull();
+    expect(parseOp(null, valid)).toBeNull();
+    expect(parseOp({ t: "replace", plan: { days: [] } }, valid)).toBeNull();
+    const p = sanitizePlan({ days: [{ stops: [{ placeId: "ist-van", slot: "kahvalti" }, { placeId: "ist-van" }, { placeId: "x" }, null], dow: 2 }] }, valid);
+    expect(p).toEqual({ days: [{ stops: [{ placeId: "ist-van", slot: "kahvalti" }], dow: 2 }] });
+    expect(sanitizeName("  <b>Ayşe\u0000</b>  ")).toBe("bAyşe/b");
+    expect(sanitizeName("x".repeat(100))).toHaveLength(24);
+    expect(sanitizeName(42)).toBe("Misafir");
+    expect(sanitizeName("   ")).toBe("Misafir");
+  });
+});
