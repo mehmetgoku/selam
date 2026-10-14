@@ -1,6 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { NativeBridge } from "@/components/NativeBridge";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover", // çentikli ekranlarda tam ekran; güvenli alanlar CSS ile
+  themeColor: "#faf7f2",
+};
 
 export const metadata: Metadata = {
   title: "Selam — Türkiye gezi rehberi",
@@ -11,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="tr">
       <body className="min-h-screen antialiased">
+        <NativeBridge />
         <header className="border-b border-stone-200 bg-white/80 backdrop-blur sticky top-0 z-20">
           <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
             <Link href="/" className="font-bold text-lg text-brand">

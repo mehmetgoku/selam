@@ -12,3 +12,7 @@ body {
   color: var(--color-ink);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+/* Çentik / ana ekran çubuğu güvenli alanları (mobil uygulama) */
+header { padding-top: env(safe-area-inset-top); }
+main { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }

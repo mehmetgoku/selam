@@ -26,16 +26,18 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
   aynı planı **canlı** düzenler (2 sn'de bir senkron), mekânlara 👍 oy verir, kimlerin odada olduğunu ve son hareketleri görür.
   Değişiklikler tüm planı değil küçük **işlemler** (ekle/çıkar/taşı/oy…) olarak sunucuda sırayla uygulanır; iki kişi aynı anda
   farklı mekân eklerse ikisi de kalır. Sunucu her girdiyi doğrular (şekil, mekân kimliği, boyut sınırı, ad temizliği).
+- **Mobil**: Capacitor ile iOS/Android kabuğu; rehber çevrimdışı açılır, **Yakınımda** (konum yalnızca cihazda), yerel paylaşım menüsü, kalıcı yerel depolama, derin bağlantı ve Android geri tuşu desteği.
 - **Selam skoru**: editoryal puan + (varsa, taze ve yorumlu) **TripAdvisor** puanı (Bayes düzeltmeli, %60/%40; az yorumlu “5.0” yerler şişmez).
   **Google puanı skora girmez** — Google içeriği saklanamadığı için yalnızca canlı rozet olarak gösterilir.
 
-> **Mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — harita Google'a geçti ve Google içeriği artık saklanmıyor (yalnızca canlı); kalan lisans notları orada.
+> **Mobil uygulama (iOS/Android) ve mağaza yayını:** bkz. [`docs/MOBILE.md`](docs/MOBILE.md) — Capacitor projeleri hazır (`android/`, `ios/`); native derleme ve cihaz testi henüz yapılmadı, durum tablosu orada.
 
 ## Çalıştırma
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
+npm run build:mobile && npx cap sync   # mobil paket (bkz. docs/MOBILE.md)
 npm test           # sıralama, plan, saatler, ortak işlemler, ingest/lisans testleri
 npm run build
 ```

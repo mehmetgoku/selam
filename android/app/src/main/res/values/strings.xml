@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Selam</string>
+    <string name="title_activity_main">Selam</string>
+    <string name="package_name">app.selam.gezirehberi</string>
+    <string name="custom_url_scheme">app.selam.gezirehberi</string>
+</resources>

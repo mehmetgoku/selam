@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { applyOp, emptyState, type Op, type RoomState } from "./collab";
+import { apiUrl, storage } from "./platform";
 import type { ScoredPlace } from "./types";
 
 export interface Me {
@@ -21,21 +22,20 @@ export type RoomStatus = "idle" | "loading" | "live" | "offline" | "notfound";
 const ME_KEY = "selam:me";
 const POLL_MS = 2000;
 
-function loadMe(): Me {
+function newMe(): Me {
+  return { cid: crypto.randomUUID().replace(/-/g, "").slice(0, 20), name: "" };
+}
+async function loadMe(): Promise<Me> {
   try {
-    const raw = localStorage.getItem(ME_KEY);
+    const raw = await storage.get(ME_KEY);
     if (raw) {
       const m = JSON.parse(raw) as Me;
       if (typeof m.cid === "string" && m.cid.length >= 8) return { cid: m.cid, name: typeof m.name === "string" ? m.name : "" };
     }
   } catch {}
-  return { cid: crypto.randomUUID().replace(/-/g, "").slice(0, 20), name: "" };
+  return newMe();
 }
-const saveMe = (m: Me) => {
-  try {
-    localStorage.setItem(ME_KEY, JSON.stringify(m));
-  } catch {}
-};
+const saveMe = (m: Me) => void storage.set(ME_KEY, JSON.stringify(m));
 
 /**
  * Ortak plan odasına bağlanır. Değişiklikler iyimser uygulanır (anında görünür), sunucu yanıtı kesindir.
@@ -59,7 +59,17 @@ export function useRoom(roomId: string | null, places: ScoredPlace[]) {
     return { validIds: new Set(names.keys()), nameOf: (id: string) => names.get(id) ?? id };
   }, [places]);
 
-  useEffect(() => setMe(loadMe()), []);
+  useEffect(() => {
+    let alive = true;
+    loadMe().then((m) => {
+      if (!alive) return;
+      saveMe(m); // yeni kimlik üretildiyse kalıcı yap
+      setMe(m);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const apply = useCallback((room: { version: number; participants: Participant[]; state?: RoomState; log?: LogEntry[] }) => {
     versionRef.current = room.version;
@@ -75,7 +85,7 @@ export function useRoom(roomId: string | null, places: ScoredPlace[]) {
     if (!roomId || !m.cid || inflight.current > 0) return;
     try {
       const q = new URLSearchParams({ cid: m.cid, name: m.name, since: String(versionRef.current) });
-      const res = await fetch(`/api/rooms/${roomId}?${q}`, { cache: "no-store" });
+      const res = await fetch(apiUrl(`/api/rooms/${roomId}?${q}`), { cache: "no-store" });
       if (res.status === 404) return setStatus("notfound");
       if (!res.ok) return setStatus("offline");
       if (inflight.current === 0) apply(await res.json());
@@ -108,7 +118,7 @@ export function useRoom(roomId: string | null, places: ScoredPlace[]) {
       });
       inflight.current++;
       try {
-        const res = await fetch(`/api/rooms/${roomId}/ops`, {
+        const res = await fetch(apiUrl(`/api/rooms/${roomId}/ops`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cid: m.cid, name: m.name, op }),

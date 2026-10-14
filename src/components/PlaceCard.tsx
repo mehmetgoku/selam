@@ -11,12 +11,15 @@ export function PlaceCard({
   inPlan,
   onToggle,
   now,
+  distanceKm,
 }: {
   place: ScoredPlace;
   rank?: number;
   inPlan?: boolean;
   onToggle?: () => void;
   now?: Now | null;
+  /** "Yakınımda" açıkken kullanıcıya uzaklık (km) */
+  distanceKm?: number;
 }) {
   const { tripadvisor } = place;
   const live = useLive();
@@ -38,7 +41,7 @@ export function PlaceCard({
           <h3 className="font-bold leading-snug">{place.name}</h3>
           <p className="text-xs text-stone-500">
             {catEmoji(place.cat)} {place.food ? foodLabel(place.food) : catLabel(place.cat)} · {place.district} ·{" "}
-            {PRICE_LABEL[place.price]}
+            {PRICE_LABEL[place.price]}{distanceKm !== undefined && ` · 📍 ${distanceKm < 1 ? `${Math.round(distanceKm * 10) * 100} m` : `${distanceKm.toFixed(1)} km`}`}
           </p>
         </div>
         <div className="shrink-0 text-right" title="Selam skoru: dış puanlar + editoryal değerlendirme">

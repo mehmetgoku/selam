@@ -10,6 +10,7 @@ import { decodePlan, encodePlan, shareText } from "@/lib/sharePlan";
 import { usePlan } from "@/lib/usePlan";
 import { useRoom } from "@/lib/useRoom";
 import { ensureLive, useLive, waitLive } from "@/lib/live";
+import { apiUrl, shareLink, webOrigin } from "@/lib/platform";
 import type { Category, Plan, ScoredPlace } from "@/lib/types";
 
 export function Planner({ slug, cityName, places, center }: { slug: string; cityName: string; places: ScoredPlace[]; center: [number, number] }) {
@@ -52,19 +53,16 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
-  const shareUrl = () => `${window.location.origin}${window.location.pathname}?p=${encodeURIComponent(encodePlan(plan))}`;
+  const pagePath = () => window.location.pathname.replace(/\/?$/, "");
+  const shareUrl = () => `${webOrigin()}${pagePath()}?p=${encodeURIComponent(encodePlan(plan))}`;
   const doShare = async () => {
     const url = shareUrl();
     try {
-      if (navigator.share) {
-        await navigator.share({ title: `${cityName} gezi planım`, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      flash("Bağlantı kopyalandı");
-    } catch {
-      flash("Kopyalanamadı — adres çubuğundaki bağlantıyı kullan");
-      window.history.replaceState(null, "", url);
+      if ((await shareLink({ title: `${cityName} gezi planım`, url })) === "copied") flash("Bağlantı kopyalandı");
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError" || /cancel/i.test((e as Error)?.message ?? "")) return; // kullanıcı vazgeçti
+      flash("Paylaşılamadı — bağlantıyı elle kopyala");
+      window.history.replaceState(null, "", url.replace(webOrigin(), ""));
     }
   };
   const whatsappHref = () => {
@@ -115,7 +113,7 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
   const startRoom = async () => {
     setCreating(true);
     try {
-      const res = await fetch("/api/rooms", {
+      const res = await fetch(apiUrl("/api/rooms"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ city: slug, plan: local.plan.days.some((d) => d.stops.length) ? local.plan : undefined }),
@@ -132,8 +130,8 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
   };
   const copyInvite = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?oda=${roomId}`);
-      flash("Davet bağlantısı kopyalandı");
+      const url = `${webOrigin()}${pagePath()}?oda=${roomId}`;
+      if ((await shareLink({ title: `${cityName} ortak plan`, text: "Birlikte gezi planlayalım:", url })) === "copied") flash("Davet bağlantısı kopyalandı");
     } catch {
       flash("Kopyalanamadı — adres çubuğundaki bağlantıyı gönder");
     }
@@ -191,7 +189,7 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
                   ))}
                 </div>
                 <button onClick={copyInvite} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
-                  Davet bağlantısını kopyala
+                  👥 Davet et
                 </button>
               </div>
               {room.me.cid && !room.me.name ? (

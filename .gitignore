@@ -7,3 +7,5 @@ data/raw
 next-env.d.ts
 data/signals
 data/*.db*
+mobile-www
+.next-mobile

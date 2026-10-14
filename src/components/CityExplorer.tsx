@@ -2,7 +2,9 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { CATEGORIES, FOOD_TYPES, PRICE_LABEL, VIBES } from "@/lib/categories";
+import { haversineKm } from "@/lib/geo";
 import { openStatus } from "@/lib/hours";
+import { getPosition } from "@/lib/platform";
 import { ensureLive, useLive } from "@/lib/live";
 import { useNow } from "@/lib/useNow";
 import { usePlan } from "@/lib/usePlan";
@@ -22,6 +24,25 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
   const [vibe, setVibe] = useState<Vibe | null>(null);
   const [maxPrice, setMaxPrice] = useState<1 | 2 | 3 | 4>(4);
   const [openOnly, setOpenOnly] = useState(false);
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearMsg, setNearMsg] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  // Konum yalnızca cihazda sıralama için kullanılır; sunucuya gönderilmez, saklanmaz.
+  const toggleNear = async () => {
+    if (pos) return setPos(null);
+    setLocating(true);
+    setNearMsg(null);
+    try {
+      const p = await getPosition();
+      if (haversineKm(p, { lat: center[0], lng: center[1] }) > 80) {
+        setNearMsg("Şu an bu şehirde görünmüyorsun; “Yakınımda” şehre vardığında çalışır.");
+      } else setPos(p);
+    } catch {
+      setNearMsg("Konum alınamadı. Konum iznini kontrol et.");
+    } finally {
+      setLocating(false);
+    }
+  };
   const now = useNow();
   const live = useLive();
   /** Etkin çalışma saati: canlı Google saati (varsa) yoksa editoryal "24/7". Google saati hiçbir yere kaydedilmez. */
@@ -36,26 +57,27 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
     [places, now, hoursOf],
   );
 
-  const filtered = useMemo(
-    () =>
-      places.filter(
+  const filtered = useMemo(() => {
+    const list = places.filter(
         (p) =>
           (cat === "hepsi" || p.cat === cat) &&
           (!food || p.food === food) &&
           (!vibe || p.vibes.includes(vibe)) &&
           p.price <= maxPrice &&
           (!openOnly || !now || openStatus(hoursOf(p), now).state !== "closed"),
-      ),
-    [places, cat, food, vibe, maxPrice, openOnly, now, hoursOf],
-  );
+    );
+    return pos ? list.sort((a, b) => haversineKm(pos, a) - haversineKm(pos, b)) : list;
+  }, [places, cat, food, vibe, maxPrice, openOnly, now, hoursOf, pos]);
 
   const card = (p: ScoredPlace, rank?: number) => (
-    <PlaceCard key={p.id} place={p} now={now} rank={rank} inPlan={has(p.id)} onToggle={() => (has(p.id) ? remove(p.id) : add(p.id))} />
+    <PlaceCard key={p.id} place={p} now={now} rank={rank} distanceKm={pos ? haversineKm(pos, p) : undefined} inPlan={has(p.id)} onToggle={() => (has(p.id) ? remove(p.id) : add(p.id))} />
   );
 
   // Gruplu görünümler: "Hepsi" → kategori başına en iyi 3; "Yemek" → tür başına en iyi 3
   let sections: { title: string; items: ScoredPlace[] }[] | null = null;
-  if (cat === "hepsi") {
+  if (pos) {
+    sections = null; // "Yakınımda": düz liste, en yakından uzağa
+  } else if (cat === "hepsi") {
     sections = CATEGORIES.map((c) => ({
       title: `${c.emoji} Şehrin en iyileri · ${c.label}`,
       items: filtered.filter((p) => p.cat === c.id).slice(0, 3),
@@ -69,7 +91,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
 
   return (
     <div className="space-y-5">
-      <div className="space-y-3 sticky top-14 z-10 -mx-4 px-4 py-3 bg-paper/95 backdrop-blur border-b border-stone-200">
+      <div style={{ top: "calc(3.5rem + env(safe-area-inset-top))" }} className="space-y-3 sticky z-10 -mx-4 px-4 py-3 bg-paper/95 backdrop-blur border-b border-stone-200">
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button className={chip(cat === "hepsi")} onClick={() => { setCat("hepsi"); setFood(null); }}>
             ✨ Hepsi
@@ -113,6 +135,15 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
             ))}
           </select>
           <button
+            aria-pressed={!!pos}
+            onClick={toggleNear}
+            disabled={locating}
+            className={chip(!!pos)}
+            title="Konumun yalnızca cihazında kullanılır; sunucuya gönderilmez"
+          >
+            📍 {locating ? "Konum alınıyor…" : "Yakınımda"}
+          </button>
+          <button
             aria-pressed={openOnly}
             onClick={() => {
               const next = !openOnly;
@@ -145,6 +176,8 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
         </div>
       </div>
 
+      {nearMsg && <p role="status" className="text-sm text-stone-600">{nearMsg}</p>}
+      {pos && <p className="text-xs text-stone-500">En yakından uzağa sıralı. Konumun cihazında kalır, kaydedilmez.</p>}
       {openOnly && now && (
         <p className="text-xs text-stone-500">
           İstanbul saatiyle {String(Math.floor(now.minute / 60)).padStart(2, "0")}:{String(now.minute % 60).padStart(2, "0")}.{" "}

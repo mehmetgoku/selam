@@ -1,38 +1,78 @@
-# Mağaza yayını (App Store / Google Play) — yol haritası ve riskler
+# Mobil uygulama (iOS / Android) ve mağaza yayını
 
-Durum: web uygulaması (Next.js) hazır; mobil paketleme **henüz yapılmadı**. Aşağıdakiler yayın öncesi kararlar ve engellerdir.
+Mimari: **Capacitor** ile web uygulaması statik olarak paketlenir (`mobile-www/`) ve iOS/Android kabuğunun içine gömülür.
+Rehber verisi pakette olduğundan **çevrimdışı açılır**; harita, canlı Google verisi ve **ortak oda** internet ister.
 
-## 1. Paketleme yaklaşımı
+```
+npm run build:mobile      # MOBILE_BUILD=1: statik dışa aktarım → mobile-www/ (API rotaları pakete girmez)
+npm run mobile:sync       # build:mobile + cap sync (web dosyalarını android/ ve ios/ içine kopyalar)
+npm run mobile:android    # sync + Android Studio'yu açar
+npm run mobile:ios        # sync + Xcode'u açar (yalnızca macOS)
+npm run mobile:assets     # resources/*.png → simgeler + açılış ekranı (iOS/Android)
+```
 
-| Seçenek | Artı | Eksi |
-|---|---|---|
-| **Capacitor** ile mevcut web uygulamasını sarmak (önerilen başlangıç) | Tek kod tabanı, hızlı; push, paylaşım, konum, takvim gibi yerel eklentiler | Saf web sarmalayıcı Apple 4.2 ("minimum işlevsellik") kapsamında reddedilebilir → yerel özellik şart |
-| React Native / Expo ile yeniden yazım | En yerel his, çevrimdışı güçlü | Arayüzün yeniden yazılması; `src/lib/*` (sıralama, plan, saatler, ortak işlemler) olduğu gibi paylaşılır |
+## Durum — ne doğrulandı, ne doğrulanmadı
 
-**Sunucu bağımlılığı:** Ortak oda API'leri (`/api/rooms`) bir sunucu ister; uygulama yayınlanmış bir sunucuya (`https://…`) bağlanmalı, statik `export` olarak tamamen pakete gömülemez. Kalıcı diskli sunucu ya da `src/server/rooms.ts`'in paylaşımlı veritabanına taşınması gerekir (README).
+| | Durum |
+|---|---|
+| Statik paket (2 MB), tüm şehir/plan sayfaları | ✅ derlendi, farklı kökenden servis edilip tarayıcıda denendi |
+| `cap sync` (android + ios) | ✅ çalışıyor |
+| Mobil → barındırılan sunucu (ortak oda, CORS) | ✅ ayrı köken + ön kontrol (preflight) ile denendi |
+| Yakınımda (konum), paylaşım, kalıcı depolama (web yolları) | ✅ tarayıcıda denendi |
+| **Android derleme / APK** | ❌ **bu ortamda yapılamadı** (Android SDK yok) — Android Studio'da ilk derleme sende |
+| **iOS derleme / TestFlight** | ❌ **yapılamadı** (macOS/Xcode gerekir) |
+| Native eklentiler (Preferences, Share, Geolocation, App, StatusBar, SplashScreen) gerçek cihazda | ❌ denenmedi — kod yolları yazıldı ve tip kontrolünden geçti, cihazda test edilmeli |
+| Simge / açılış ekranı | ⚠️ **yer tutucu** ("S" harfi) — gerçek marka tasarımıyla değiştirip `resources/` içinde `mobile:assets` çalıştır |
 
-**Mağaza onayı için önerilen yerel özellikler:** çevrimdışı plan/rehber önbelleği, "yakınımda" (konum), plan paylaşım menüsü (yerel share sheet), plan için takvime ekleme, bildirim (ortak odada değişiklik).
+## Yayın öncesi DEĞİŞTİRİLMESİ gerekenler
 
-## 2. Veri lisansı — YAYIN ÖNCESİ ÇÖZÜLMELİ
+1. **`appId`** (`capacitor.config.ts` → şu an `app.selam.gezirehberi`): sahibi olduğun alan adının tersi olmalı; mağazada bir kez seçilir, sonra değişmez. Değiştirirsen `android/app/build.gradle` (`applicationId`, `namespace`), Android paket klasörü ve iOS `PRODUCT_BUNDLE_IDENTIFIER` da değişir (en kolayı: `android/` ve `ios/`'u silip `npx cap add android/ios` ile yeniden üretmek, sonra bu belgedeki manifest/plist eklerini tekrar yapmak).
+2. **`YOUR_DOMAIN`** (`android/app/src/main/AndroidManifest.xml`): derin bağlantı alan adı.
+3. **Ortam değişkenleri** (derleme zamanında gömülür, `.env.example`):
+   - `NEXT_PUBLIC_API_BASE` — barındırılan sunucu (`https://api.…`). Boşsa ortak oda mobilde çalışmaz.
+   - `NEXT_PUBLIC_WEB_URL` — paylaşılan bağlantıların kökü (`https://…`). Boşsa `capacitor://localhost` paylaşılır → bozuk bağlantı.
+   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAP_ID` — harita (aşağıya bak).
+4. **Sunucu**: `CORS_ORIGINS` varsayılanı `capacitor://localhost,https://localhost,http://localhost` (iOS ve Android WebView kökenleri) — değiştirmen gerekmez; yalnızca farklı bir şema kullanırsan.
+5. **Sürüm**: Android `versionCode`/`versionName` (`android/app/build.gradle`), iOS `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` (Xcode). Her mağaza yüklemesinde artır.
 
-- **Harita: Google Haritalar'a geçildi (karar verildi).** Places içeriği Google dışı haritada gösterilemediği için `GoogleMap.tsx` kullanılır; Leaflet/OSM yalnızca anahtarsız geliştirme yedeğidir ve üretimde kullanılmamalıdır.
-  - Maps JS anahtarı tarayıcıda görünür: **HTTP referrer** ile kısıtla, yalnızca "Maps JavaScript API"ye yetkilendir, bütçe/kota uyarısı kur. Ingest için **ayrı** sunucu anahtarı kullan.
-  - Capacitor (mobil) WebView'ında referrer `https://localhost` / `capacitor://localhost` olur; ya bu kaynakları anahtar kısıtına ekle ya da yerel Google Maps SDK eklentisine (`@capacitor/google-maps`) geç.
-  - Üretimde kendi **Map ID**'ni tanımla (`NEXT_PUBLIC_GOOGLE_MAP_ID`); varsayılan `DEMO_MAP_ID` yalnızca geliştirme içindir.
-- **Places içeriği saklama — ÇÖZÜLDÜ (seçenek b):** Google'dan yalnızca Place ID saklanır; puan/saat canlı çekilir ve yalnızca bellekte tutulur; Google puanı skora girmez (`src/lib/live.ts`, `rank.ts`, `data.ts`). Kalan konular: (1) canlı çağrı maliyeti (puan/saat alanları pahalı SKU; yalnızca kullanıcı eylemiyle tetiklenir, bütçe/kota uyarısı şart); (2) “oturum belleğinde tutma”nın Google'ın güncel önbellek şartlarına uygunluğunu doğrula; (3) Google içeriği gösterilen yerlerde Google atfı/“Google Maps’te aç” bağlantısı korunur.
-- **TripAdvisor:** puan/yorum sayısı saklanıyor (`fetchedAt` + 30 gün bayatlık sınırı) ve kartta bağlantı olarak atıf yapılıyor; Content API'nin güncel önbellek süresi ve **logo/atıf zorunluluğu** doğrulanmalı (şu an logo yok). Puan, “Selam skoru”na karışıyor: TripAdvisor puanı olarak etiketlenmeden birleştirmenin şartlara uygunluğu gözden geçirilmeli.
-- **OpenStreetMap karoları (tile.openstreetmap.org)** yoğun/ticari uygulama kullanımına uygun değil; Mapbox/MapTiler vb. sağlayıcıya geçilmeli, OSM atıfı korunmalı.
+## Google Haritalar anahtarı mobilde
 
-## 3. Mağaza gereklilikleri
+Maps JS anahtarı **HTTP referrer** ile kısıtlanır; WebView'ın kökeni `https://localhost` (Android) ve `capacitor://localhost` (iOS) olduğundan bu kökenleri izinli referrer listesine ekle — ya da mobil için **ayrı bir anahtar** üretip yalnızca bunlara kısıtla (önerilen; web anahtarından ayrı bütçe/kota izlenir). Uzun vadede yerel Google Maps SDK eklentisi (`@capacitor/google-maps`) daha sağlam ve hızlıdır; ancak harita/işaretçi/balon kodunun (`src/components/map/`) yeniden yazılmasını gerektirir.
 
-- **Gizlilik politikası** (KVKK uyumlu) ve **App Privacy / Play Data Safety** formları: toplanan veri = ortak odada girilen takma ad, rastgele istemci kimliği, (varsa) konum. Hesap yok → hesap silme zorunluluğu şu an yok; hesap eklenirse zorunlu olur.
-- **Kullanıcı üretimli içerik (Apple 1.2):** ortak odalarda takma ad ve paylaşılan plan var. Şikâyet/engelleme mekanizması ve içerik filtresi planlanmalı (şu an ad temizleme dışında yok).
-- **Mağaza varlıkları:** simge, ekran görüntüleri, açıklama (TR; mümkünse EN), yaş derecesi (bar/alkol içeriği → yaş sınırı beyanı gerekir).
-- **Hesaplar:** Apple Developer Program (yıllık ücretli), Google Play Console (tek seferlik ücret); yeni kişisel Play hesaplarında yayın öncesi kapalı test şartı olabilir — güncel kuralları kontrol edin.
+## Derin bağlantılar (davet linki uygulamada açılsın)
 
-## 4. Önerilen sıra
+`NativeBridge` `appUrlOpen` olayını dinler ve yalnızca `/`, `/sehir/<şehir>`, `/sehir/<şehir>/plan` rotalarına (sorgu parametreleriyle: `?oda=…`) yönlendirir. İşletim sistemi bağlantıyı uygulamaya vermesi için alan adında doğrulama dosyaları yayınlanmalı:
 
-1. Places içeriği saklama kararı (yukarıdaki a/b/c) ve TripAdvisor atıfı.
-2. Barındırma: ortak oda sunucusu için kalıcı depo.
-3. Capacitor iskeleti + 2–3 yerel özellik (çevrimdışı, konum, paylaşım).
-4. TestFlight / Play iç test → kapalı test → yayın.
+- **Android**: `https://<alan-adı>/.well-known/assetlinks.json` (paket adı + imza sertifikası SHA-256). Manifest'teki `YOUR_DOMAIN`'i doldur.
+- **iOS**: `https://<alan-adı>/.well-known/apple-app-site-association` (Team ID + bundle id, yol `/sehir/*`) ve Xcode'da *Associated Domains* → `applinks:<alan-adı>`.
+
+Bu dosyalar olmadan bağlantı tarayıcıda açılır (ortak oda web'de de çalışır) — bozulan bir şey olmaz.
+
+## İmzalama ve yükleme
+
+- **Android**: Android Studio → *Build > Generate Signed Bundle* (AAB). Yükleme anahtarını/keystore'u güvenle yedekle (kaybedersen güncelleme yapılamaz; Play App Signing'i aç). Google Play Console geliştirici hesabı (tek seferlik ücret). Yeni kişisel hesaplarda yayından önce kapalı test koşulu olabilir — güncel kuralı Console'da kontrol et.
+- **iOS**: Xcode → *Product > Archive* → App Store Connect/TestFlight. Apple Developer Program (yıllık ücret). `npx cap doctor` hangi Xcode/araç sürümünün gerektiğini söyler.
+- Ortak: önce iç test (Play iç test / TestFlight), sonra yayın.
+
+## Mağaza gereklilikleri
+
+- **Apple 4.2 (minimum işlevsellik)**: web sitesini saran uygulamalar reddedilebilir. Bu uygulamada yerel değer katan parçalar: çevrimdışı rehber, konuma göre sıralama, yerel paylaşım menüsü, derin bağlantı, kalıcı yerel depolama. Gönderim notlarında bunları belirt; ileride bildirim ve takvime ekleme güçlü eklemeler olur.
+- **Gizlilik politikası (KVKK)** zorunlu: taslak `docs/store/privacy-tr.md` — **hukuki inceleme olmadan yayınlama**.
+- **App Privacy / Play Data Safety**: yanıt taslağı `docs/store/listing-tr.md` içinde; Google Haritalar/Places gibi üçüncü taraf SDK'ların veri akışı dahil gözden geçir.
+- **Kullanıcı üretimli içerik (Apple 1.2)**: ortak odalarda takma ad ve ortak plan var. Şikâyet/engelleme ve içerik filtresi (ad temizleme dışında) eklenmeli; en azından odadan çıkma/oda silme ve bir iletişim e-postası.
+- **Yaş derecesi**: bar/meyhane/alkollü mekân içeriği var → derecelendirme anketinde "alkol referansı" işaretle.
+- **Hesap yok** → hesap silme zorunluluğu yok; ileride hesap eklenirse (Apple 5.1.1(v)) uygulama içinden hesap silme gerekir.
+
+## Veri lisansı (özet — ayrıntı `README.md`)
+
+- Google: yalnızca Place ID saklanır; puan/saat canlı ve bellekte (kullanıcı eylemiyle); Google puanı skora girmez. Haritada Google Haritalar kullanılır. Canlı çağrılar faturalanır — bütçe uyarısı kur.
+- TripAdvisor: puan/yorum sayısı saklanır (30 gün bayatlık sınırı), kartta bağlantı olarak atıf var; **Content API'nin güncel önbellek süresi ve logo/atıf zorunluluğunu doğrula** (şu an logo yok).
+- Yer tutucu simge ve "S" markasını gerçek tasarımla değiştir; mağaza görselleri için telif/marka kontrolü yap.
+
+## Önerilen sıra
+
+1. Alan adı + barındırma (sunucu `data/selam.db` için kalıcı disk — `README.md` "Ortak oda sunucusu") → `NEXT_PUBLIC_API_BASE`, `NEXT_PUBLIC_WEB_URL`.
+2. `appId`'yi kesinleştir, `android/` ve `ios/`'u gerekirse yeniden üret; gerçek simge/açılış ekranı.
+3. Android Studio'da ilk derleme + gerçek cihazda test (konum izni, paylaşım, geri tuşu, çevrimdışı açılış, ortak oda).
+4. macOS'ta Xcode ile iOS derleme + TestFlight.
+5. Derin bağlantı dosyaları, gizlilik politikası, mağaza girişleri, iç test → yayın.

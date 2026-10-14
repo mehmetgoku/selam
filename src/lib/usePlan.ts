@@ -1,14 +1,14 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { applyOp, type Op, type OpCtx } from "./collab";
+import { storage } from "./platform";
 import type { Plan } from "./types";
 
 const key = (city: string) => `selam:plan:${city}`;
 const empty = (): Plan => ({ days: [{ stops: [] }] });
 
-function read(city: string): Plan {
+function parse(raw: string | null): Plan {
   try {
-    const raw = localStorage.getItem(key(city));
     if (raw) {
       const p = JSON.parse(raw) as Plan;
       if (Array.isArray(p.days) && p.days.length) return p;
@@ -23,20 +23,26 @@ export function usePlan(city: string) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setPlanState(read(city));
-    setReady(true);
-    const onStorage = (e: StorageEvent) => e.key === key(city) && setPlanState(read(city));
+    let alive = true;
+    storage.get(key(city)).then((raw) => {
+      if (!alive) return;
+      setPlanState(parse(raw));
+      setReady(true);
+    });
+    // sekmeler arası senkron yalnızca web'de (native'de tek pencere)
+    const onStorage = (e: StorageEvent) => e.key === key(city) && setPlanState(parse(e.newValue));
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      alive = false;
+      window.removeEventListener("storage", onStorage);
+    };
   }, [city]);
 
   const setPlan = useCallback(
     (fn: (p: Plan) => Plan) => {
       setPlanState((prev) => {
         const next = fn(prev);
-        try {
-          localStorage.setItem(key(city), JSON.stringify(next));
-        } catch {}
+        void storage.set(key(city), JSON.stringify(next));
         return next;
       });
     },
