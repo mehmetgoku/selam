@@ -1,5 +1,11 @@
 import { Capacitor } from "@capacitor/core";
 
+/**
+ * Tek dosyalık, sunucusuz sürüm (docs/MOBILE.md "Hızlı telefon sürümü"): ortak oda, harita, konum ve bağlantı paylaşımı kapalıdır.
+ * Derleme zamanı bayrağı: NEXT_PUBLIC_STANDALONE=1
+ */
+export const STANDALONE = process.env.NEXT_PUBLIC_STANDALONE === "1";
+
 /** Capacitor (iOS/Android) içinde mi çalışıyoruz? Web'de her zaman false. */
 export const isNative = () => typeof window !== "undefined" && Capacitor.isNativePlatform();
 

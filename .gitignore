@@ -9,3 +9,4 @@ data/signals
 data/*.db*
 mobile-www
 .next-mobile
+dist-standalone

@@ -21,3 +21,16 @@ export function mapsUrl(p: { name: string; lat: number; lng: number; google?: { 
     ? `https://www.google.com/maps/search/?api=1&query=${q}&query_place_id=${p.google.id}`
     : `https://www.google.com/maps/search/?api=1&query=${q}%20${p.lat},${p.lng}`;
 }
+
+/**
+ * Google Haritalar yön tarifi bağlantısı (ilk durak başlangıç, son durak varış, aradakiler ara nokta).
+ * Google URL'si en fazla 9 ara noktayı destekler; fazlası sondan kırpılır. Yapılandırılmış API/anahtar gerekmez.
+ */
+export function directionsUrl(stops: { name: string; lat: number; lng: number; google?: { id?: string } }[]) {
+  if (stops.length < 2) return null;
+  const pt = (p: { lat: number; lng: number }) => `${p.lat},${p.lng}`;
+  const mid = stops.slice(1, -1).slice(0, 9);
+  const q = new URLSearchParams({ api: "1", origin: pt(stops[0]), destination: pt(stops[stops.length - 1]) });
+  if (mid.length) q.set("waypoints", mid.map(pt).join("|"));
+  return `https://www.google.com/maps/dir/?${q.toString()}`;
+}

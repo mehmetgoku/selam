@@ -1,0 +1,15 @@
+{
+  "name": "Selam — Türkiye Gezi Rehberi",
+  "short_name": "Selam",
+  "description": "Şehre göre en iyi mekânlar, nedeniyle birlikte. Planla, paylaş, birlikte gez.",
+  "lang": "tr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#c2410c",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

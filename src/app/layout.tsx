@@ -13,6 +13,9 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Selam — Türkiye gezi rehberi",
   description: "Şehre göre kürasyonlu mekânlar, 'neden iyi?' açıklamaları ve tek tıkla gezi planı.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Selam", statusBarStyle: "default" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -48,7 +48,6 @@ export function shareText(
   return [
     `📍 ${cityName} gezi planım (Selam)`,
     ...days.flatMap((d) => ["", `*${d.label}*`, ...d.lines]),
-    "",
-    `Planı aç: ${url}`,
+    ...(url ? ["", `Planı aç: ${url}`] : []),
   ].join("\n");
 }

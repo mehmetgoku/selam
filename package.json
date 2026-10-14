@@ -14,7 +14,8 @@
     "mobile:sync": "npm run build:mobile && cap sync",
     "mobile:android": "npm run mobile:sync && cap open android",
     "mobile:ios": "npm run mobile:sync && cap open ios",
-    "mobile:assets": "capacitor-assets generate --ios --android --assetPath resources"
+    "mobile:assets": "capacitor-assets generate --ios --android --assetPath resources",
+    "build:standalone": "node scripts/build-standalone.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",
@@ -40,6 +41,7 @@
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
     "postcss": "^8.5.30",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",

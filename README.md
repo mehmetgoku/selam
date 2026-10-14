@@ -37,7 +37,8 @@ Google Maps'in “mekân listesi”nin ötesinde: şehir bazlı, kategorilere ay
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm run build:mobile && npx cap sync   # mobil paket (bkz. docs/MOBILE.md)
+npm run build:standalone               # tek dosyalık demo → dist-standalone/index.html (sunucusuz)
+npm run build:mobile && npx cap sync   # native mobil paket (bkz. docs/MOBILE.md)
 npm test           # sıralama, plan, saatler, ortak işlemler, ingest/lisans testleri
 npm run build
 ```

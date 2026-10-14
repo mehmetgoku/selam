@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { CATEGORIES, PRICE_LABEL } from "@/lib/categories";
-import { haversineKm, mapsUrl } from "@/lib/geo";
+import { directionsUrl, haversineKm, mapsUrl } from "@/lib/geo";
 import { checkVisit, DAY_NAMES } from "@/lib/hours";
 import { fmtTime, generatePlan, scheduleDay, type Pace, type PlanPrefs } from "@/lib/itinerary";
 import { MapView } from "./MapLoader";
@@ -10,7 +10,7 @@ import { decodePlan, encodePlan, shareText } from "@/lib/sharePlan";
 import { usePlan } from "@/lib/usePlan";
 import { useRoom } from "@/lib/useRoom";
 import { ensureLive, useLive, waitLive } from "@/lib/live";
-import { apiUrl, shareLink, webOrigin } from "@/lib/platform";
+import { apiUrl, shareLink, STANDALONE, webOrigin } from "@/lib/platform";
 import type { Category, Plan, ScoredPlace } from "@/lib/types";
 
 export function Planner({ slug, cityName, places, center }: { slug: string; cityName: string; places: ScoredPlace[]; center: [number, number] }) {
@@ -44,7 +44,7 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const oda = q.get("oda");
-    if (oda && /^[A-Za-z0-9_-]{12}$/.test(oda)) setRoomId(oda);
+    if (oda && !STANDALONE && /^[A-Za-z0-9_-]{12}$/.test(oda)) setRoomId(oda);
     const raw = q.get("p");
     if (raw) setShared(decodePlan(raw, new Set(places.map((p) => p.id))));
   }, [places]);
@@ -62,10 +62,10 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
     } catch (e) {
       if ((e as Error)?.name === "AbortError" || /cancel/i.test((e as Error)?.message ?? "")) return; // kullanıcı vazgeçti
       flash("Paylaşılamadı — bağlantıyı elle kopyala");
-      window.history.replaceState(null, "", url.replace(webOrigin(), ""));
+      try { window.history.replaceState(null, "", url.replace(webOrigin(), "")); } catch {}
     }
   };
-  const whatsappHref = () => {
+  const planText = (withLink: boolean) => {
     const days = plan.days
       .filter((d) => d.stops.length)
       .map((day, i) => ({
@@ -77,7 +77,19 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
           }),
         ).map((t) => `${fmtTime(t.start)} ${t.place.name}`),
       }));
-    return `https://wa.me/?text=${encodeURIComponent(shareText(cityName, days, shareUrl()))}`;
+    return shareText(cityName, days, withLink ? shareUrl() : "");
+  };
+  const whatsappHref = () => `https://wa.me/?text=${encodeURIComponent(planText(!STANDALONE))}`;
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(planText(false));
+      flash("Plan metni kopyalandı");
+    } catch {
+      const el = document.getElementById("plan-text") as HTMLTextAreaElement | null;
+      el?.focus();
+      el?.select();
+      flash("Metni seçtim — kopyala");
+    }
   };
   const adoptShared = () => {
     if (!shared) return;
@@ -148,7 +160,7 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
 
   return (
     <div className="space-y-6">
-      {!roomId && (
+      {!roomId && !STANDALONE && (
         <section className="rounded-2xl bg-white border border-stone-200 p-4 flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <h2 className="font-bold">👥 Arkadaşlarla birlikte planla</h2>
@@ -342,10 +354,20 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
                 </select>
               </h2>
               <span className="text-xs text-stone-500">
-                {timed.length > 0 && (
+                {timed.length > 0 && !STANDALONE && (
                   <button className="text-brand font-semibold mr-2" onClick={() => setMapDay(mapDay === d ? null : d)}>
                     {mapDay === d ? "Haritayı gizle" : "🗺️ Haritada gör"}
                   </button>
+                )}
+                {timed.length > 1 && (
+                  <a
+                    className="text-brand font-semibold mr-2 underline"
+                    href={directionsUrl(timed.map((t) => t.place)) ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Rotayı Google Haritalar’da aç
+                  </a>
                 )}
                 {timed.length} durak · ~{km.toFixed(1)} km{timed.length ? ` · ${fmtTime(timed[0].start)}–${fmtTime(timed[timed.length - 1].end)}` : ""}
               </span>
@@ -426,9 +448,15 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
       {ready && plan.days.some((d) => d.stops.length) && (
         <section className="rounded-2xl bg-white border border-stone-200 p-4 flex flex-wrap items-center gap-3">
           <h2 className="font-bold mr-auto">Planı paylaş</h2>
-          <button onClick={doShare} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
-            🔗 Bağlantıyı paylaş / kopyala
-          </button>
+          {STANDALONE ? (
+            <button onClick={copyText} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
+              📋 Plan metnini kopyala
+            </button>
+          ) : (
+            <button onClick={doShare} className="rounded-full bg-brand text-white px-4 py-1.5 text-sm font-semibold">
+              🔗 Bağlantıyı paylaş / kopyala
+            </button>
+          )}
           <a
             href={whatsappHref()}
             target="_blank"
@@ -437,8 +465,20 @@ export function Planner({ slug, cityName, places, center }: { slug: string; city
           >
             WhatsApp
           </a>
+          {STANDALONE && (
+            <textarea
+              id="plan-text"
+              readOnly
+              rows={6}
+              value={planText(false)}
+              className="basis-full rounded-lg border border-stone-300 bg-paper p-2 text-xs font-mono"
+              aria-label="Plan metni"
+            />
+          )}
           <p className="basis-full text-xs text-stone-500">
-            Bağlantı planın o anki halini içerir (sunucuda saklanmaz); sonradan yaptığın değişiklikler için yeniden paylaş.
+            {STANDALONE
+              ? "Bu sürümde plan yalnızca bu cihazda saklanır; arkadaşına metin olarak gönderebilirsin."
+              : "Bağlantı planın o anki halini içerir (sunucuda saklanmaz); sonradan yaptığın değişiklikler için yeniden paylaş."}
           </p>
         </section>
       )}

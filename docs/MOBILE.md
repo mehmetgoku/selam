@@ -1,5 +1,14 @@
 # Mobil uygulama (iOS / Android) ve mağaza yayını
 
+## Telefonda hemen kullanım (mağaza gerekmeden)
+
+| Yol | Ne gerekir | Kapsam |
+|---|---|---|
+| **Tek dosyalık demo** (`npm run build:standalone` → `dist-standalone/index.html`, ~350 KB) | Hiçbir şey: statik bir sayfa olarak her yerde açılır (yayınlanmış özel bağlantı, kendi sunucun, hatta dosya olarak) | Rehber, filtreler, “şu an açık” (24/7 yerler), plan oluşturucu, plan metni/WhatsApp paylaşımı, Google Haritalar'da rota bağlantısı. **Ağ olmadan da çalışır.** Ortak oda, harita, konum, bağlantıyla paylaşım **kapalı** (sunucu/dış kaynak gerektirir) |
+| **PWA** (barındırılan Next uygulaması) | Alan adı + barındırma | Tam özellikler; telefonda tarayıcıdan “Ana ekrana ekle” (manifest + simgeler hazır) |
+| **Native uygulama** (aşağısı) | Android Studio / Xcode, geliştirici hesapları | Tam özellikler + mağaza |
+
+
 Mimari: **Capacitor** ile web uygulaması statik olarak paketlenir (`mobile-www/`) ve iOS/Android kabuğunun içine gömülür.
 Rehber verisi pakette olduğundan **çevrimdışı açılır**; harita, canlı Google verisi ve **ortak oda** internet ister.
 

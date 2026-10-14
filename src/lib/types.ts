@@ -97,3 +97,6 @@ export interface PlanDay {
 export interface Plan {
   days: PlanDay[];
 }
+
+/** Şehir + puanlanmış mekânlar (sunucu ya da paket tarafından yüklenir) */
+export type CityData = Omit<City, "places"> & { places: ScoredPlace[] };

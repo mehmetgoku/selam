@@ -1,0 +1,13 @@
+@import "../app/globals.css";
+@source "../components";
+@source "./";
+
+/* Tek dosyalık sürüm: bilinçli tek (açık) görünüm; tüm renkler @theme belirteçlerinden ve body arka planı açıkça ayarlı. */
+:root { color-scheme: light; }
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+/* kök zaten üst/alt güvenli alan dolgusunu taşıyor; globals.css'teki çift dolguyu kaldır */
+header { padding-top: 0; }
+main { padding-bottom: 1.5rem; }

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CATEGORIES, FOOD_TYPES, PRICE_LABEL, VIBES } from "@/lib/categories";
 import { haversineKm } from "@/lib/geo";
 import { openStatus } from "@/lib/hours";
-import { getPosition } from "@/lib/platform";
+import { getPosition, STANDALONE } from "@/lib/platform";
 import { ensureLive, useLive } from "@/lib/live";
 import { useNow } from "@/lib/useNow";
 import { usePlan } from "@/lib/usePlan";
@@ -134,7 +134,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
               <option key={n} value={n}>{n === 4 ? "Her bütçe" : `En fazla ${PRICE_LABEL[n]}`}</option>
             ))}
           </select>
-          <button
+          {!STANDALONE && <button
             aria-pressed={!!pos}
             onClick={toggleNear}
             disabled={locating}
@@ -142,7 +142,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
             title="Konumun yalnızca cihazında kullanılır; sunucuya gönderilmez"
           >
             📍 {locating ? "Konum alınıyor…" : "Yakınımda"}
-          </button>
+          </button>}
           <button
             aria-pressed={openOnly}
             onClick={() => {
@@ -155,7 +155,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
           >
             🟢 Şu an açık
           </button>
-          <div className="flex rounded-full border border-stone-300 bg-white overflow-hidden" role="group" aria-label="Görünüm">
+          {!STANDALONE && <div className="flex rounded-full border border-stone-300 bg-white overflow-hidden" role="group" aria-label="Görünüm">
             {(["liste", "harita"] as const).map((v) => (
               <button
                 key={v}
@@ -166,7 +166,7 @@ export function CityExplorer({ slug, places, center }: { slug: string; places: S
                 {v === "liste" ? "☰ Liste" : "🗺️ Harita"}
               </button>
             ))}
-          </div>
+          </div>}
           <Link
             href={`/sehir/${slug}/plan`}
             className="ml-auto rounded-full bg-brand text-white px-4 py-1.5 font-semibold"
